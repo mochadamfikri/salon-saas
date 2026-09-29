@@ -2,6 +2,7 @@
 
 from logging.config import fileConfig
 
+import app.models  # noqa: F401 - Register Phase 1 ORM models with Base.metadata
 from alembic import context
 from app.core.config import get_settings
 from app.db import Base
