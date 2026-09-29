@@ -104,7 +104,7 @@ The API is the product:
 
 ### Backend
 
-**Framework:** FastAPI with Python 3.11+
+**Framework:** FastAPI with Python 3.14
 
 **Key Features:**
 - Async/await for high performance
@@ -114,15 +114,16 @@ The API is the product:
 - Dependency injection
 
 **Key Libraries:**
-- SQLAlchemy: ORM
-- Alembic: Database migrations
-- Pydantic: Data validation
-- python-jose: JWT handling
-- passlib: Password hashing
+- SQLAlchemy 2.0: ORM
+- Alembic 1.20: Database migrations
+- Pydantic 2.13: Data validation
+- Psycopg 3: PostgreSQL driver (`postgresql+psycopg://`)
+- python-jose: JWT handling (Phase 1+)
+- passlib: Password hashing (Phase 1+)
 
 ### Database
 
-**Primary Database:** PostgreSQL 15+
+**Primary Database:** PostgreSQL 16
 
 **Reasons:**
 - Strong ACID compliance
@@ -179,7 +180,7 @@ salon-saas/
 ├── infra/             # Infrastructure as code (future)
 ├── docs/              # Project documentation
 ├── scripts/           # Build and deployment scripts
-└── docker-compose.yml # Local development environment
+└── compose.yaml       # Local development environment
 ```
 
 ### Application Boundaries
@@ -539,7 +540,7 @@ Multiple layers of security:
 **Required for all environments:**
 ```bash
 APP_ENV=development|staging|production
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql+psycopg://...
 REDIS_URL=redis://...
 JWT_SECRET=...
 API_BASE_URL=...

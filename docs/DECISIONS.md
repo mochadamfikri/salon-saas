@@ -299,6 +299,41 @@ Python 3.14-specific syntax is not enabled for static tooling until the tools ad
 
 **Status:** ACCEPTED
 
+
+---
+
+## ADR-014: Modern Compose Specification (compose.yaml)
+
+**Decision:**
+Use `compose.yaml` (modern Docker Compose v2 specification) instead of legacy `docker-compose.yml` with top-level `version` attribute.
+
+**Reason:**
+- The `version` attribute is deprecated in Compose v2.
+- `compose.yaml` is the official preferred filename.
+- Pinned image tags (`postgres:16-alpine`, `redis:7-alpine`) ensure reproducible builds.
+- Named volumes (`salon_saas_postgres_data`, `salon_saas_redis_data`) provide data persistence.
+- Built-in container healthchecks (`pg_isready`, `redis-cli ping`) allow automated readiness detection.
+
+**Status:** ACCEPTED
+
+---
+
+## ADR-015: Server-Side Frontend-to-Backend Connectivity
+
+**Decision:**
+Implement Phase 0 frontend-to-API connectivity check server-side in Next.js App Router (Server Component calling FastAPI `/health`).
+
+**Reason:**
+- Keeps `API_BASE_URL` server-only — no `NEXT_PUBLIC_*` exposure.
+- Avoids browser CORS configuration during Phase 0 foundation.
+- Clean architectural boundary: Browser → Next.js (SSR) → FastAPI.
+- Server-side error handling degrades gracefully to "API is unavailable" display without browser-side errors.
+
+**Alternatives Considered:**
+- Client-side fetch (`NEXT_PUBLIC_API_BASE_URL`): Rejected for Phase 0 to avoid CORS complexity and unnecessary public URL exposure.
+
+**Status:** ACCEPTED
+
 ---
 
 ## Notes
