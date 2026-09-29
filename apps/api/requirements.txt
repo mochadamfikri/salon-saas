@@ -1,0 +1,17 @@
+# Core framework
+fastapi==0.141.1
+uvicorn[standard]==0.34.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# Infrastructure clients
+sqlalchemy==2.0.36
+alembic==1.20.0
+psycopg[binary]==3.3.6
+redis==5.2.1
+
+# Development and test tooling
+pytest==8.3.4
+httpx==0.28.1
+ruff==0.8.6
+black==24.10.0

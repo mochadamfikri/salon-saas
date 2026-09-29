@@ -1,0 +1,22 @@
+[project]
+name = "salon-saas-api"
+version = "0.1.0"
+description = "FastAPI foundation for the Salon SaaS platform"
+requires-python = ">=3.14,<3.15"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+# Ruff 0.8.x has no py314 target yet; project runtime remains Python 3.14.
+target-version = "py313"
+line-length = 100
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
