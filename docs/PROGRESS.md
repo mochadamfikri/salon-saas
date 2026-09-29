@@ -157,6 +157,11 @@ Phase 0 Approved HEAD: `524977d`
 
 ### Checkpoint A Details
 
+#### Remediation Checkpoint A — PASS
+- **A1. Database-Level Normalized Email Invariant:** Migration `2317437c36e3` adds `uq_users_lower_email` functional unique index on `LOWER(email)`. Raw SQL inserts with case-variant duplicates are rejected at DB level.
+- **A2. Checkpoint Report Consistency:** `docs/PHASE_1_CHECKPOINT_A_REPORT.md` created, tracked, and pushed to remote branch.
+- **A3. Task Mapping Reconciliation:** Task numbering verified aligned across `PHASE_1_AUTH_TENANCY.md` and `PROGRESS.md`.
+
 #### P1-001 Public Repository Security Pre-flight — PASS
 - Repository visibility: public (confirmed `mochadamfikri/salon-saas`).
 - `.env` has never been committed to Git history.
