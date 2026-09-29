@@ -32,7 +32,7 @@ def test_migrations_upgrade_configured_development_database_to_head() -> None:
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
 
-    assert revision == "20260929_0001"
+    assert revision == "20260929_0002"
 
 
 def test_migrations_upgrade_clean_database_to_head() -> None:
@@ -68,10 +68,27 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
         clean_connection_kwargs = {**connection_kwargs, "dbname": database_name}
         with psycopg.connect(**clean_connection_kwargs) as connection:
             revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
-            table = connection.execute("SELECT to_regclass('public.platform_metadata')").fetchone()
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    """
+                    SELECT tablename
+                    FROM pg_tables
+                    WHERE schemaname = 'public'
+                    """
+                ).fetchall()
+            }
 
-        assert revision == ("20260929_0001",)
-        assert table == ("platform_metadata",)
+        assert revision == ("20260929_0002",)
+        assert {
+            "platform_metadata",
+            "users",
+            "salons",
+            "salon_memberships",
+            "auth_sessions",
+            "salon_invitations",
+            "password_reset_tokens",
+        }.issubset(tables)
     finally:
         with psycopg.connect(**connection_kwargs) as connection:
             connection.execute(
