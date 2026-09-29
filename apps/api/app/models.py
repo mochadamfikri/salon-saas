@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db import Base
 
@@ -47,6 +47,11 @@ class User(TimestampMixin, Base):
     memberships: Mapped[list["SalonMembership"]] = relationship(back_populates="user")
     auth_sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
+
+    @validates("email")
+    def normalize_email(self, key: str, value: str) -> str:
+        """Strip whitespace and convert to lowercase for case-insensitive uniqueness."""
+        return value.strip().lower() if value else value
 
 
 class Salon(TimestampMixin, Base):
