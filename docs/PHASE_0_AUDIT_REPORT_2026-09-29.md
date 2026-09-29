@@ -69,7 +69,14 @@ Strict scope boundaries were maintained: no Phase 1 business features (authentic
 - Workspace: `/home/ubuntu/salon-saas`
 - Branch: `develop`
 - Remote: `https://github.com/mochadamfikri/salon-saas.git` (private)
-- GitHub Actions run: https://github.com/mochadamfikri/salon-saas/actions/runs/36600426727
+- Commit Traceability:
+  - Commit `9fc8c8e`: Final frontend/backend connectivity code-bearing commit (CI run 36600426727: SUCCESS)
+  - Commit `bf75b6a`: Documentation & ADR reconciliation commit (CI run 36601365506: SUCCESS)
+  - Commit `fc19746`: Documentation & final audit report commit (CI run 36602046063: SUCCESS)
+  - Host Binding & Security Fix commit: Current HEAD updating `compose.yaml` to explicit `127.0.0.1` bindings
+- Effective Service Host Bindings:
+  - PostgreSQL: `127.0.0.1:5432->5432/tcp` (loopback only)
+  - Redis: `127.0.0.1:6379->6379/tcp` (loopback only)
 
 ---
 
@@ -87,7 +94,7 @@ Strict scope boundaries were maintained: no Phase 1 business features (authentic
 
 1. **Docker socket access:** Requires `sudo` for `docker compose` because the `ubuntu` user lacks Docker socket permissions on this development host. Documented in `docs/PROGRESS.md`.
 2. **Static lint target version:** Ruff and Black configured with `py313` target because the pinned tool releases do not yet support a `py314` target, although runtime is Python 3.14.7. Documented in ADR-013.
-3. **Database port exposure:** Development PostgreSQL and Redis ports are bound to `0.0.0.0` in `compose.yaml`. Recommend binding to loopback (`127.0.0.1`) before exposing host to non-local networks.
+3. **Database port exposure (RESOLVED):** Development PostgreSQL and Redis ports are bound exclusively to loopback (`127.0.0.1:5432` and `127.0.0.1:6379`) in `compose.yaml`. Non-local access is completely blocked at the socket binding layer.
 
 ---
 
