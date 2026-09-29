@@ -68,7 +68,7 @@ Strict scope boundaries were maintained: no Phase 1 business features (authentic
 
 - Workspace: `/home/ubuntu/salon-saas`
 - Branch: `develop`
-- Remote: `https://github.com/mochadamfikri/salon-saas.git` (private)
+- Remote: `https://github.com/mochadamfikri/salon-saas.git` (public as of Phase 1 pre-flight; originally initialized private)
 - Commit Traceability:
   - Commit `9fc8c8e`: Final frontend/backend connectivity code-bearing commit (CI run 36600426727: SUCCESS)
   - Commit `bf75b6a`: Documentation & ADR reconciliation commit (CI run 36601365506: SUCCESS)
@@ -86,7 +86,7 @@ Strict scope boundaries were maintained: no Phase 1 business features (authentic
 - `.env` is gitignored; `.env.example` contains only safe development placeholders.
 - API URL kept server-only via `API_BASE_URL` (no `NEXT_PUBLIC_*` exposure).
 - No production database or environment was accessed.
-- Repository is private.
+- Repository is public (changed from private during Phase 1 pre-flight).
 
 ---
 
