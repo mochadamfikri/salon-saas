@@ -67,7 +67,7 @@ salon-saas/
 │   ├── AGENT_RULES.md
 │   └── PROGRESS.md
 ├── scripts/           # Build and deployment scripts
-├── docker-compose.yml # Development infrastructure
+├── compose.yaml        # Development infrastructure
 ├── .env.example       # Environment variables template
 └── README.md
 ```
@@ -145,8 +145,8 @@ cd apps/web
 # Use correct Node version
 nvm use  # or: nvm use 24
 
-# Install dependencies
-npm install
+# Install dependencies from the lockfile
+npm ci
 
 # Start development server
 npm run dev
