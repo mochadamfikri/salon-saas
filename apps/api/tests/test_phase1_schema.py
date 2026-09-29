@@ -218,3 +218,42 @@ def test_foreign_key_restricts_deletion() -> None:
         session.query(User).filter(User.id == user.id).delete()
         session.commit()
         session.close()
+
+
+def test_database_enforces_case_insensitive_email_uniqueness() -> None:
+    """Verify DB-level LOWER(email) index prevents case duplicates via raw SQL."""
+    from sqlalchemy import text
+
+    generator = get_db()
+    session = next(generator)
+    unique_suffix = uuid.uuid4().hex[:8]
+    email_lower = f"dbtest_{unique_suffix}@example.com"
+    email_upper = f"DBTEST_{unique_suffix}@EXAMPLE.COM"
+
+    try:
+        # Insert first user with lowercase email via raw SQL (bypassing ORM validator)
+        user_id_1 = uuid.uuid4()
+        session.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash) VALUES (:id, :email, :password_hash)"
+            ),
+            {"id": user_id_1, "email": email_lower, "password_hash": "hash1"},
+        )
+        session.commit()
+
+        # Attempt to insert second user with uppercase variant via raw SQL
+        user_id_2 = uuid.uuid4()
+        with pytest.raises(IntegrityError):
+            session.execute(
+                text(
+                    "INSERT INTO users (id, email, password_hash) "
+                    "VALUES (:id, :email, :password_hash)"
+                ),
+                {"id": user_id_2, "email": email_upper, "password_hash": "hash2"},
+            )
+            session.commit()
+        session.rollback()
+    finally:
+        session.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id_1})
+        session.commit()
+        session.close()

@@ -32,7 +32,7 @@ def test_migrations_upgrade_configured_development_database_to_head() -> None:
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
 
-    assert revision == "20260929_0002"
+    assert revision == "2317437c36e3"
 
 
 def test_migrations_upgrade_clean_database_to_head() -> None:
@@ -79,7 +79,7 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
                 ).fetchall()
             }
 
-        assert revision == ("20260929_0002",)
+        assert revision == ("2317437c36e3",)
         assert {
             "platform_metadata",
             "users",
