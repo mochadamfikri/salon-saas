@@ -88,7 +88,7 @@ The API is the product:
 
 ### Frontend
 
-**Framework:** Next.js 14+ with TypeScript
+**Framework:** Next.js 16.x Active LTS with TypeScript
 
 **Key Features:**
 - Server-side rendering for SEO (public pages)

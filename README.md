@@ -30,7 +30,7 @@ Salon SaaS provides:
 ## Technology Stack
 
 ### Frontend
-- **Framework:** Next.js 14+ with TypeScript
+- **Framework:** Next.js 16.x Active LTS with TypeScript
 - **Runtime:** Node.js 24 LTS
 - **UI:** TBD (Phase 1+)
 

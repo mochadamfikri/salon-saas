@@ -1,0 +1,19 @@
+{
+  "name": "salon-saas",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-tenant Salon SaaS platform monorepo",
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "scripts": {
+    "lint:web": "npm --workspace @salon-saas/web run lint",
+    "test:web": "npm --workspace @salon-saas/web run test",
+    "build:web": "npm --workspace @salon-saas/web run build"
+  }
+}

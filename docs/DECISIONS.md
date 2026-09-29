@@ -6,10 +6,10 @@ This document tracks all significant architectural decisions made during the Sal
 
 ## ADR-001: Use PostgreSQL as Primary Database
 
-**Decision:**  
+**Decision:**
 Use PostgreSQL as the primary database.
 
-**Reason:**  
+**Reason:**
 The system has strong relational data requirements and needs transactional integrity for:
 - Booking and schedule management
 - Payment processing
@@ -26,7 +26,7 @@ PostgreSQL provides:
 - Row-level security for tenant isolation
 - Proven scalability
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - MongoDB: Rejected due to lack of transaction support across collections and weaker consistency guarantees for financial data
 
 **Status:** ACCEPTED
@@ -35,10 +35,10 @@ PostgreSQL provides:
 
 ## ADR-002: Use Monorepo Structure
 
-**Decision:**  
+**Decision:**
 Use a monorepo structure with separate apps for web and api.
 
-**Reason:**  
+**Reason:**
 - Shared code reusability (types, utilities, UI components)
 - Atomic changes across frontend and backend
 - Simplified dependency management
@@ -56,7 +56,7 @@ salon-saas/
 │   └── shared/    # Shared utilities and types
 ```
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - Polyrepo: Rejected due to increased coordination overhead and duplicated code
 
 **Status:** ACCEPTED
@@ -65,10 +65,10 @@ salon-saas/
 
 ## ADR-003: Use FastAPI for Backend
 
-**Decision:**  
+**Decision:**
 Use FastAPI (Python) for the backend API.
 
-**Reason:**  
+**Reason:**
 - Modern async Python framework
 - Automatic OpenAPI/Swagger documentation
 - Built-in data validation with Pydantic
@@ -77,7 +77,7 @@ Use FastAPI (Python) for the backend API.
 - Large ecosystem for integrations (payment, messaging)
 - Excellent for complex business logic
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - Express.js (Node.js): Good option, but Python ecosystem better for business integrations
 - Django: Too heavyweight, REST framework is less modern than FastAPI
 
@@ -87,10 +87,10 @@ Use FastAPI (Python) for the backend API.
 
 ## ADR-004: Use Next.js for Frontend
 
-**Decision:**  
+**Decision:**
 Use Next.js with TypeScript for the frontend.
 
-**Reason:**  
+**Reason:**
 - Server-side rendering for public storefront (SEO)
 - Static generation for marketing pages
 - Client-side SPA for admin dashboards
@@ -105,7 +105,7 @@ Use Next.js with TypeScript for the frontend.
 - Salon admin
 - Platform super-admin
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - React SPA: Lacks SSR for SEO
 - Vue/Nuxt: Smaller ecosystem
 
@@ -115,10 +115,10 @@ Use Next.js with TypeScript for the frontend.
 
 ## ADR-005: Multi-Tenant Architecture from Day One
 
-**Decision:**  
+**Decision:**
 Design for multi-tenancy from the beginning. All tenant-specific data must be scoped to salon_id or equivalent.
 
-**Reason:**  
+**Reason:**
 - Core product requirement: one platform serves many salons
 - Retrofitting multi-tenancy is expensive and risky
 - Data isolation is critical for security and compliance
@@ -129,7 +129,7 @@ Design for multi-tenancy from the beginning. All tenant-specific data must be sc
 - Row-level security policies in database
 - Separate schemas per tenant (future option)
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - Build single-tenant first: Rejected, would require major refactoring
 
 **Status:** ACCEPTED
@@ -138,10 +138,10 @@ Design for multi-tenancy from the beginning. All tenant-specific data must be sc
 
 ## ADR-006: Use Redis for Caching and Queues
 
-**Decision:**  
+**Decision:**
 Use Redis for caching, job queues, and session storage.
 
-**Reason:**  
+**Reason:**
 - High-performance in-memory data store
 - Supports various data structures
 - Pub/sub for real-time notifications
@@ -156,7 +156,7 @@ Use Redis for caching, job queues, and session storage.
 - Rate limiting
 - Session management
 
-**Alternatives Considered:**  
+**Alternatives Considered:**
 - Memcached: Lacks data structure support
 - RabbitMQ: Overkill for initial needs, Redis sufficient
 
@@ -166,10 +166,10 @@ Use Redis for caching, job queues, and session storage.
 
 ## ADR-007: Backend as Source of Truth
 
-**Decision:**  
+**Decision:**
 Backend is the single source of truth for all business logic, pricing, permissions, and state.
 
-**Reason:**  
+**Reason:**
 - Security: Frontend can be manipulated
 - Consistency: One place for business rules
 - Multi-client support: Mobile, web, integrations all use same API
@@ -194,10 +194,10 @@ Backend is the single source of truth for all business logic, pricing, permissio
 
 ## ADR-008: Migration-Based Database Schema Management
 
-**Decision:**  
+**Decision:**
 Use Alembic for database migrations. All schema changes must go through migrations.
 
-**Reason:**  
+**Reason:**
 - Version control for database schema
 - Repeatable deployments
 - Rollback capability
@@ -216,7 +216,7 @@ Use Alembic for database migrations. All schema changes must go through migratio
 
 ## ADR-009: Environment Isolation
 
-**Decision:**  
+**Decision:**
 Maintain strict separation between development, staging, and production environments.
 
 **Rules:**
@@ -232,10 +232,10 @@ Maintain strict separation between development, staging, and production environm
 
 ## ADR-010: Use Docker for Development Dependencies
 
-**Decision:**  
+**Decision:**
 Use Docker containers for PostgreSQL and Redis in development.
 
-**Reason:**  
+**Reason:**
 - Consistent development environment
 - Easy setup for new developers
 - Isolated from host system
@@ -244,7 +244,7 @@ Use Docker containers for PostgreSQL and Redis in development.
 
 **Alternatives Considered:**
 - Native installation: Harder to maintain consistency across team
-- Docker Compose: Not available in current environment, will document manual docker run commands
+- Manual `docker run` commands: Rejected; Docker Compose plugin is required and installed for reproducible development infrastructure
 
 **Status:** ACCEPTED
 
@@ -252,7 +252,7 @@ Use Docker containers for PostgreSQL and Redis in development.
 
 ## ADR-011: Git Branch Strategy
 
-**Decision:**  
+**Decision:**
 Use main + develop branches with feature branches.
 
 **Structure:**
@@ -265,6 +265,37 @@ Use main + develop branches with feature branches.
 - Develop in feature branches
 - Merge to develop for testing
 - Merge develop to main for releases
+
+**Status:** ACCEPTED
+
+---
+
+## ADR-012: Use synchronous Psycopg 3 SQLAlchemy foundation
+
+**Decision:**
+Use SQLAlchemy synchronous engine with the Psycopg 3 driver (`postgresql+psycopg://`) for Phase 0.
+
+**Reason:**
+It gives a small, conventional migration and database foundation while preserving a future path to an async engine if real workload requirements warrant it. Psycopg 3 supports the approved Python 3.14 runtime.
+
+**Alternatives Considered:**
+- `psycopg2-binary`: Rejected for this greenfield project.
+- Async SQLAlchemy: Deferred; no Phase 0 workload requires it.
+
+**Status:** ACCEPTED
+
+---
+
+## ADR-013: Static tool compatibility target temporarily uses Python 3.13
+
+**Decision:**
+Keep project runtime declaration at Python `>=3.14,<3.15`, but configure Ruff and Black with their highest currently accepted static target, `py313`.
+
+**Reason:**
+The pinned tooling releases do not yet accept a `py314` target. Runtime dependency installation and tests execute on Python 3.14.7.
+
+**Trade-off:**
+Python 3.14-specific syntax is not enabled for static tooling until the tools add a py314 target.
 
 **Status:** ACCEPTED
 

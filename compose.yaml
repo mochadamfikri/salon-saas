@@ -1,31 +1,26 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: salon-saas-postgres
     environment:
-      POSTGRES_USER: salon_user
-      POSTGRES_PASSWORD: salon_password_dev
-      POSTGRES_DB: salon_saas_dev
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U salon_user -d salon_saas_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
-    networks:
-      - salon-network
 
   redis:
     image: redis:7-alpine
-    container_name: salon-saas-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -33,17 +28,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 5s
     restart: unless-stopped
-    networks:
-      - salon-network
 
 volumes:
   postgres_data:
     name: salon_saas_postgres_data
   redis_data:
     name: salon_saas_redis_data
-
-networks:
-  salon-network:
-    name: salon_saas_network
-    driver: bridge
