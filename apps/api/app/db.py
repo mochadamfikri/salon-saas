@@ -1,6 +1,6 @@
 """Database engine and ORM metadata foundation."""
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, func
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import get_settings
@@ -21,6 +21,14 @@ class Base(DeclarativeBase):
 
     metadata = metadata
 
+
+platform_metadata = Table(
+    "platform_metadata",
+    metadata,
+    Column("key", String(100), primary_key=True),
+    Column("value", String(255), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
 
 engine = create_engine(get_settings().database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

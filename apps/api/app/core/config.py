@@ -1,12 +1,15 @@
 """Environment-based application configuration."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
 
 class Settings(BaseSettings):
-    """Runtime settings loaded from environment variables."""
+    """Runtime settings loaded from the project environment file."""
 
     app_env: str = "development"
     app_name: str = "Salon SaaS Platform"
@@ -15,7 +18,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(
-        env_file="../../.env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
