@@ -272,26 +272,34 @@ This document defines strict rules for agents working on the Salon SaaS platform
 
 ## Phase-Specific Rules
 
-### Phase 0 (Current)
+### Phase 0 (Completed)
+- Phase 0 foundation tasks (P0-001 through P0-020) are complete and passed.
+- Foundation architecture, runtimes, tests, and CI are frozen as baseline.
 
-1. **DO NOT implement business logic**
-   - No authentication system
-   - No booking logic
-   - No payment processing
-   - No notification sending
-   - Skeleton/placeholders OK
+### Phase 1 (Active — Authentication & Multi-Tenant Identity)
+1. **Incremental Checkpoint Rule**
+   - Implement Phase 1 strictly in approved engineering checkpoints (e.g. Checkpoint A: P1-001..P1-004).
+   - Do not jump ahead to unapproved checkpoint tasks.
 
-2. **Focus on foundation**
-   - Repository structure
-   - Build system
-   - Testing framework
-   - Database connection
-   - Development environment
+2. **Global User Identity & Tenant Decoupling**
+   - `users` is global identity.
+   - NEVER place `salon_id` or tenant role directly on `users`.
+   - Tenant roles (`owner`, `manager`, `staff`) belong exclusively in `salon_memberships`.
+   - `customer` is not a tenant role; customers are authenticated global users.
 
-3. **Stop at Phase 0 completion**
-   - Do not continue to Phase 1
-   - Provide complete report
-   - Wait for audit approval
+3. **Multi-Tenant Isolation & Ownership**
+   - Every tenant endpoint must explicitly check active membership.
+   - Cross-tenant access attempts must be rejected with 404 (defense in depth) or 403.
+   - Foreign keys to tenant resources must use `ondelete="RESTRICT"`.
+
+4. **Security & Cryptography Standards**
+   - Passwords must be hashed using Argon2id (`pwdlib[argon2]`).
+   - Raw tokens (refresh tokens, reset tokens, invitation tokens) must NEVER be persisted in plaintext; persist only cryptographic hashes (`token_hash`).
+   - Refresh token rotation must include reuse detection (revoking the entire token family upon reuse).
+   - Super admin elevation (`is_super_admin`) must have no public endpoints.
+
+5. **Out-of-Scope for Phase 1**
+   - DO NOT implement operational salon features: booking/reservations, services/products, payments, invoices, schedule calendars, WhatsApp/Telegram messaging, POS, or loyalty programs.
 
 ---
 
