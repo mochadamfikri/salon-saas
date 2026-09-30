@@ -7,7 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependencies import get_current_session, get_current_user
+from app.core.config import get_settings
 from app.core.dependencies import get_db
+from app.core.rate_limit import rate_limit
 from app.models import AuthSession, User
 from app.schemas.auth import (
     LoginRequest,
@@ -30,8 +32,18 @@ from app.services.auth import (
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
+_settings = get_settings()
+_register_rate_limit = rate_limit(_settings.rate_limit_register, prefix="auth-register")
+_login_rate_limit = rate_limit(_settings.rate_limit_login, prefix="auth-login")
+_refresh_rate_limit = rate_limit(_settings.rate_limit_refresh, prefix="auth-refresh")
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_register_rate_limit)],
+)
 def register(
     payload: RegisterRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -50,7 +62,7 @@ def register(
         ) from None
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(_login_rate_limit)])
 def login(
     payload: LoginRequest,
     db: Annotated[Session, Depends(get_db)],
@@ -73,7 +85,7 @@ def login(
         ) from None
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh", response_model=TokenResponse, dependencies=[Depends(_refresh_rate_limit)])
 def refresh(
     payload: RefreshRequest,
     db: Annotated[Session, Depends(get_db)],

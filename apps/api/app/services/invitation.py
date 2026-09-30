@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -16,11 +17,27 @@ class InvitationError(Exception):
 
 
 class InvitationNotFoundError(InvitationError):
-    """Invitation not found, expired, revoked, or already accepted."""
+    """Token is invalid or unknown."""
+
+
+class InvitationExpiredError(InvitationError):
+    """Invitation is past its expiry time."""
+
+
+class InvitationRevokedError(InvitationError):
+    """Invitation was revoked before acceptance."""
+
+
+class InvitationAlreadyAcceptedError(InvitationError):
+    """Invitation was already redeemed."""
+
+
+class InvitationEmailMismatchError(InvitationError):
+    """Authenticated user email does not match the invited email."""
 
 
 class DuplicateMembershipError(InvitationError):
-    """User already has active membership in this salon."""
+    """User already has a membership in this salon."""
 
 
 def create_invitation(
@@ -86,63 +103,84 @@ def revoke_invitation(db: Session, invitation_id: uuid.UUID, salon_id: uuid.UUID
     db.flush()
 
 
-def accept_invitation(db: Session, raw_token: str, accepting_user: User) -> SalonMembership:
-    """Accept an invitation and create active membership.
+def accept_invitation(
+    db: Session, raw_token: str, accepting_user: User
+) -> tuple[SalonMembership, Salon]:
+    """Accept an invitation and create an active membership.
+
+    Concurrency-safe: the invitation row is locked (SELECT ... FOR UPDATE) so
+    concurrent redemptions of the same token serialize — exactly one wins and
+    the loser observes ``accepted_at``. The ``uq_salon_memberships_salon_user``
+    unique constraint is the backstop for races across distinct invitations
+    (same user + salon); a lost race surfaces as ``DuplicateMembershipError``.
+
+    The returned salon is loaded server-side from the invitation itself; the
+    client never supplies a salon_id to this endpoint.
 
     Args:
         db: Database session.
-        raw_token: Raw invitation token.
-        accepting_user: Authenticated user accepting invitation.
+        raw_token: Raw invitation token (hashed before comparison; never logged).
+        accepting_user: Authenticated user accepting the invitation.
 
     Returns:
-        Created SalonMembership.
+        Tuple of (created SalonMembership, invitation's Salon).
 
     Raises:
-        InvitationNotFoundError: Token invalid, expired, revoked, or accepted.
-        DuplicateMembershipError: User already has membership in target salon.
+        InvitationNotFoundError: Token invalid or unknown.
+        InvitationAlreadyAcceptedError: Invitation already redeemed.
+        InvitationRevokedError: Invitation was revoked.
+        InvitationExpiredError: Invitation is past its expiry.
+        InvitationEmailMismatchError: Authenticated email != invited email.
+        DuplicateMembershipError: User already has a membership in this salon.
     """
     token_hash_value = hash_token(raw_token)
     now = datetime.now(UTC)
 
-    stmt = select(SalonInvitation).where(SalonInvitation.token_hash == token_hash_value)
+    # Row-level lock: concurrent redemptions of the same invitation serialize
+    # here; the loser observes accepted_at and is rejected. Never two winners.
+    stmt = (
+        select(SalonInvitation)
+        .where(SalonInvitation.token_hash == token_hash_value)
+        .with_for_update()
+    )
     invitation = db.execute(stmt).scalar_one_or_none()
 
-    if not invitation:
+    if invitation is None:
         raise InvitationNotFoundError("Invalid invitation token")
 
     if invitation.accepted_at is not None:
-        raise InvitationNotFoundError("Invitation already accepted")
+        raise InvitationAlreadyAcceptedError("Invitation has already been accepted")
 
     if invitation.revoked_at is not None:
-        raise InvitationNotFoundError("Invitation has been revoked")
+        raise InvitationRevokedError("Invitation has been revoked")
 
     if invitation.expires_at < now:
-        raise InvitationNotFoundError("Invitation has expired")
+        raise InvitationExpiredError("Invitation has expired")
 
-    # Verify email matches (normalized)
-    if accepting_user.email != invitation.email:
-        raise InvitationNotFoundError("Invitation email does not match authenticated user")
+    # Normalized email comparison (both sides are normalized on write, but
+    # normalize again defensively — never trust caller-controlled values).
+    if accepting_user.email.strip().lower() != invitation.email.strip().lower():
+        raise InvitationEmailMismatchError(
+            "Invitation email mismatch: this invitation was sent to a different email address"
+        )
 
-    # Check for existing membership
-    existing = (
-        db.execute(
-            select(SalonMembership).where(
-                and_(
-                    SalonMembership.salon_id == invitation.salon_id,
-                    SalonMembership.user_id == accepting_user.id,
-                )
+    # Pre-check for a friendlier error; the unique constraint below is the
+    # authoritative guard under concurrency. A duplicate rejection does NOT
+    # consume the invitation (accepted_at is only set on success).
+    existing = db.execute(
+        select(SalonMembership).where(
+            and_(
+                SalonMembership.salon_id == invitation.salon_id,
+                SalonMembership.user_id == accepting_user.id,
             )
         )
-        .scalar_one_or_none()
-    )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise DuplicateMembershipError("User already has an active membership in this salon")
 
-    if existing:
-        raise DuplicateMembershipError("User already has membership in this salon")
-
-    # Mark invitation accepted
+    # Mark invitation accepted (one-time semantics).
     invitation.accepted_at = now
 
-    # Create membership
     membership = SalonMembership(
         salon_id=invitation.salon_id,
         user_id=accepting_user.id,
@@ -151,6 +189,31 @@ def accept_invitation(db: Session, raw_token: str, accepting_user: User) -> Salo
         joined_at=now,
     )
     db.add(membership)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as e:
+        # Lost a concurrent race (e.g. two distinct invitations for the same
+        # user+salon redeemed at once). Roll back and re-check authoritatively:
+        # if the membership now exists, the other transaction won.
+        db.rollback()
+        winner = db.execute(
+            select(SalonMembership).where(
+                and_(
+                    SalonMembership.salon_id == invitation.salon_id,
+                    SalonMembership.user_id == accepting_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if winner is not None:
+            raise DuplicateMembershipError(
+                "User already has an active membership in this salon"
+            ) from e
+        raise
 
-    return membership
+    # Salon context is loaded server-side from the invitation; the client
+    # never supplies a salon_id to this endpoint.
+    salon = db.get(Salon, invitation.salon_id)
+    if salon is None:  # pragma: no cover - FK RESTRICT guarantees presence
+        raise InvitationNotFoundError("Invalid invitation token")
+
+    return membership, salon

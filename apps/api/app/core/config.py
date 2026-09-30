@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     password_reset_minutes: int = Field(default=60, ge=5, le=1440)
     invitation_days: int = Field(default=7, ge=1, le=30)
 
+    # Redis fixed-window rate limiting (requests per 60-second window per IP).
+    rate_limit_enabled: bool = True
+    rate_limit_register: int = Field(default=5, ge=1)
+    rate_limit_login: int = Field(default=10, ge=1)
+    rate_limit_refresh: int = Field(default=60, ge=1)
+    rate_limit_password_reset: int = Field(default=5, ge=1)
+    rate_limit_invitation_accept: int = Field(default=20, ge=1)
+
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",

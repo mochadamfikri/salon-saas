@@ -40,19 +40,21 @@ def issue_password_reset_token(db: Session, email: str) -> str | None:
 
 
 def reset_password(db: Session, raw_token: str, new_password: str) -> User:
-    """Redeem an unexpired, unused reset token and revoke existing sessions."""
+    """Redeem an unexpired, unused reset token and revoke existing sessions.
+
+    Concurrency-safe: the reset token row is locked (SELECT ... FOR UPDATE) so
+    concurrent redemptions of the same token serialize — the loser observes
+    ``used_at`` and is rejected, preserving one-time semantics.
+    """
     now = datetime.now(UTC)
     token_hash_value = hash_token(raw_token)
-    reset_token = (
-        db.execute(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash_value))
-        .scalar_one_or_none()
-    )
+    reset_token = db.execute(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash_value)
+        .with_for_update()
+    ).scalar_one_or_none()
 
-    if (
-        not reset_token
-        or reset_token.used_at is not None
-        or reset_token.expires_at < now
-    ):
+    if not reset_token or reset_token.used_at is not None or reset_token.expires_at < now:
         raise InvalidPasswordResetTokenError("Invalid or expired reset token")
 
     user = db.get(User, reset_token.user_id)
