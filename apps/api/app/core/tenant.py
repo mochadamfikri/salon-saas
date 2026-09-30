@@ -85,17 +85,11 @@ def get_tenant_context(
         .first()
     )
 
-    if not membership:
-        # C-3: Return 404 for cross-tenant to hide salon existence from non-members
+    if not membership or membership.status != "active":
+        # C-5: Suspended/inactive membership must not confirm tenant access
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Salon not found",
-        )
-
-    if membership.status != "active":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Membership is not active",
         )
 
     return TenantContext(salon=salon, membership=membership, user=user, db=db)

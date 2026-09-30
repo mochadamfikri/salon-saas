@@ -15,6 +15,7 @@ from app.models import SalonMembership, User
 from app.schemas.tenant import (
     MemberRoleUpdateRequest,
     MembershipResponse,
+    MemberStatusUpdateRequest,
     MySalonResponse,
     SalonCreateRequest,
     SalonResponse,
@@ -25,6 +26,7 @@ from app.services.tenant import (
     get_user_salons,
     remove_member,
     update_member_role,
+    update_member_status,
 )
 
 router = APIRouter(tags=["tenant"])
@@ -70,13 +72,13 @@ def list_salon_members(
 
 
 @router.patch("/salons/{salon_id}/members/{membership_id}", response_model=MembershipResponse)
-def update_member_role_endpoint(
+def update_member_endpoint(
     salon_id: UUID,
     membership_id: UUID,
-    payload: MemberRoleUpdateRequest,
+    payload: MemberRoleUpdateRequest | MemberStatusUpdateRequest,
     tenant: Annotated[TenantContext, Depends(get_tenant_context)],
 ) -> MembershipResponse:
-    """Update a member's role (owner can manage all non-owners; manager can manage staff only)."""
+    """Update a non-owner member's role or active/suspended status."""
     membership = tenant.db.get(SalonMembership, membership_id)
     if not membership or membership.salon_id != salon_id:
         raise HTTPException(
@@ -84,11 +86,14 @@ def update_member_role_endpoint(
             detail="Member not found in this salon",
         )
 
-    # C-2: RBAC checks actor+target+requested_role
-    RBACPolicy.require_member_mutation(tenant.role, membership.role, payload.role)
+    requested_role = payload.role if isinstance(payload, MemberRoleUpdateRequest) else None
+    RBACPolicy.require_member_mutation(tenant.role, membership.role, requested_role)
 
     try:
-        updated = update_member_role(tenant.db, membership_id, payload.role)
+        if isinstance(payload, MemberRoleUpdateRequest):
+            updated = update_member_role(tenant.db, membership_id, payload.role)
+        else:
+            updated = update_member_status(tenant.db, membership_id, payload.status)
         tenant.db.commit()
         return MembershipResponse.model_validate(updated)
     except ValueError as e:

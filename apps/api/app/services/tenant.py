@@ -83,6 +83,18 @@ def update_member_role(db: Session, membership_id: uuid.UUID, new_role: str) -> 
     return membership
 
 
+def update_member_status(db: Session, membership_id: uuid.UUID, new_status: str) -> SalonMembership:
+    """Update a non-owner member's status after endpoint RBAC authorization."""
+    membership = db.get(SalonMembership, membership_id)
+    if not membership:
+        raise ValueError("Membership not found")
+    if membership.role == "owner":
+        raise ValueError("Cannot suspend owner")
+    membership.status = new_status
+    db.flush()
+    return membership
+
+
 def remove_member(db: Session, membership_id: uuid.UUID) -> None:
     """Remove a non-owner member after endpoint RBAC authorization."""
     membership = db.get(SalonMembership, membership_id)

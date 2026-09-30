@@ -75,3 +75,9 @@ class MemberRoleUpdateRequest(BaseModel):
     """Allowed non-owner role update payload."""
 
     role: str = Field(pattern=r"^(manager|staff)$")
+
+
+class MemberStatusUpdateRequest(BaseModel):
+    """Membership status update payload."""
+
+    status: str = Field(pattern=r"^(active|suspended)$")

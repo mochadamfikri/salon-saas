@@ -134,7 +134,131 @@ def test_create_salon_without_slug_generates_safe_unique_slug(db_session: Sessio
     assert second["slug"] == "beauty-wellness-studio-2"
 
 
-@pytest.mark.parametrize("slug", ["admin", "api", "auth", "me", "salons"])
+def test_suspended_member_gets_same_404_as_non_member(
+    owned_salon: tuple[dict[str, Any], str, Session]
+) -> None:
+    salon, _, db = owned_salon
+    _, membership, suspended_token = _add_membership(
+        db, salon["id"], "staff", "suspended-list@example.com"
+    )
+    membership.status = "suspended"
+    db.commit()
+
+    response = client.get(
+        f"/salons/{salon['id']}/members",
+        headers={"Authorization": f"Bearer {suspended_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Salon not found"
+
+
+def test_manager_can_suspend_staff(owned_salon: tuple[dict[str, Any], str, Session]) -> None:
+    salon, _, db = owned_salon
+    _, _, manager_token = _add_membership(db, salon["id"], "manager", "manager-suspend@example.com")
+    _, staff_membership, _ = _add_membership(db, salon["id"], "staff", "staff-suspend@example.com")
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{staff_membership.id}",
+        headers={"Authorization": f"Bearer {manager_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "suspended"
+    db.refresh(staff_membership)
+    assert staff_membership.status == "suspended"
+
+
+def test_manager_cannot_suspend_manager(owned_salon: tuple[dict[str, Any], str, Session]) -> None:
+    salon, _, db = owned_salon
+    _, _, actor_token = _add_membership(
+        db, salon["id"], "manager", "manager-suspend-actor@example.com"
+    )
+    _, target_membership, _ = _add_membership(
+        db, salon["id"], "manager", "manager-suspend-target@example.com"
+    )
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{target_membership.id}",
+        headers={"Authorization": f"Bearer {actor_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_staff_cannot_suspend_staff(owned_salon: tuple[dict[str, Any], str, Session]) -> None:
+    salon, _, db = owned_salon
+    _, _, staff_actor_token = _add_membership(
+        db, salon["id"], "staff", "staff-suspend-actor@example.com"
+    )
+    _, target_membership, _ = _add_membership(
+        db, salon["id"], "staff", "staff-suspend-target@example.com"
+    )
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{target_membership.id}",
+        headers={"Authorization": f"Bearer {staff_actor_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_owner_can_suspend_manager(owned_salon: tuple[dict[str, Any], str, Session]) -> None:
+    salon, owner_token, db = owned_salon
+    _, manager_membership, _ = _add_membership(
+        db, salon["id"], "manager", "owner-suspend-manager@example.com"
+    )
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{manager_membership.id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "suspended"
+
+
+def test_owner_cannot_suspend_owner(owned_salon: tuple[dict[str, Any], str, Session]) -> None:
+    salon, owner_token, db = owned_salon
+    owner_membership = (
+        db.query(SalonMembership)
+        .filter(SalonMembership.salon_id == salon["id"], SalonMembership.role == "owner")
+        .one()
+    )
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{owner_membership.id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_cross_tenant_membership_id_is_hidden(
+    owned_salon: tuple[dict[str, Any], str, Session]
+) -> None:
+    salon, owner_token, db = owned_salon
+    other_user, other_token = _create_user_and_token(db, "other-tenant-owner@example.com")
+    other_salon = _create_salon(other_token, slug="other-membership-salon")
+    _, other_membership, _ = _add_membership(
+        db, other_salon["id"], "staff", "other-membership-staff@example.com"
+    )
+
+    response = client.patch(
+        f"/salons/{salon['id']}/members/{other_membership.id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"status": "suspended"},
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("slug", ["admin", "api", "auth", "docs", "health", "me", "salons"])
 def test_reserved_slug_is_rejected(db_session: Session, slug: str) -> None:
     _, token = _create_user_and_token(db_session, f"reserved-{slug}@example.com")
     response = client.post(
