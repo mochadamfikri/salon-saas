@@ -1,13 +1,25 @@
 """Phase 1 global identity, tenant, and security-token ORM models.
+Phase 2 salon operations core models (services, staff, customers).
 
 This module intentionally defines persistence only. Authentication business flows,
 JWTs, password hashing, and API endpoints belong to later Phase 1 tasks.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -75,6 +87,8 @@ class Salon(TimestampMixin, Base):
     )
     memberships: Mapped[list["SalonMembership"]] = relationship(back_populates="salon")
     invitations: Mapped[list["SalonInvitation"]] = relationship(back_populates="salon")
+    services: Mapped[list["SalonService"]] = relationship(back_populates="salon")
+    customers: Mapped[list["SalonCustomer"]] = relationship(back_populates="salon")
 
 
 class SalonMembership(TimestampMixin, Base):
@@ -100,6 +114,7 @@ class SalonMembership(TimestampMixin, Base):
 
     salon: Mapped["Salon"] = relationship(back_populates="memberships")
     user: Mapped["User"] = relationship(back_populates="memberships")
+    staff_profile: Mapped["StaffProfile"] = relationship(back_populates="membership", uselist=False)
 
 
 class AuthSession(Base):
@@ -174,3 +189,136 @@ class PasswordResetToken(Base):
     used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="password_reset_tokens")
+
+
+# ============================================================================
+# Phase 2: Salon Operations Core Models
+# ============================================================================
+
+
+class SalonService(TimestampMixin, Base):
+    """Tenant-scoped service offering (haircut, facial, etc)."""
+
+    __tablename__ = "salon_services"
+    __table_args__ = (UniqueConstraint("salon_id", "name", name="uq_salon_services_salon_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    salon_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("salons.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(String(1000), nullable=True)
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_amount: Mapped[int] = mapped_column(Numeric(12, 2), nullable=False)
+    is_active: Mapped[bool] = mapped_column(nullable=False, server_default="true")
+
+    salon: Mapped["Salon"] = relationship(back_populates="services")
+    staff_assignments: Mapped[list["StaffServiceAssignment"]] = relationship(
+        back_populates="service"
+    )
+
+
+class StaffProfile(TimestampMixin, Base):
+    """Extended staff profile (one-to-one with SalonMembership)."""
+
+    __tablename__ = "staff_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    membership_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("salon_memberships.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    bio: Mapped[str] = mapped_column(String(1000), nullable=True)
+    photo_url: Mapped[str] = mapped_column(String(512), nullable=True)
+    is_bookable: Mapped[bool] = mapped_column(nullable=False, server_default="true")
+
+    membership: Mapped["SalonMembership"] = relationship(back_populates="staff_profile")
+    service_assignments: Mapped[list["StaffServiceAssignment"]] = relationship(
+        back_populates="staff_profile"
+    )
+    weekly_availability: Mapped[list["StaffWeeklyAvailability"]] = relationship(
+        back_populates="staff_profile"
+    )
+
+
+class StaffServiceAssignment(TimestampMixin, Base):
+    """Many-to-many: staff can perform specific services."""
+
+    __tablename__ = "staff_service_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "staff_profile_id",
+            "salon_service_id",
+            name="uq_staff_service_assignments_staff_service",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    staff_profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staff_profiles.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    salon_service_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("salon_services.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+
+    staff_profile: Mapped["StaffProfile"] = relationship(back_populates="service_assignments")
+    service: Mapped["SalonService"] = relationship(back_populates="staff_assignments")
+
+
+class StaffWeeklyAvailability(TimestampMixin, Base):
+    """Weekly recurring availability schedule for staff."""
+
+    __tablename__ = "staff_weekly_availability"
+    __table_args__ = (
+        CheckConstraint(
+            "day_of_week >= 1 AND day_of_week <= 7",
+            name="ck_staff_weekly_availability_day_of_week",
+        ),
+        UniqueConstraint(
+            "staff_profile_id",
+            "day_of_week",
+            "start_time",
+            name="uq_staff_weekly_availability_staff_day_start",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    staff_profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staff_profiles.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time: Mapped[time] = mapped_column(Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(Time, nullable=False)
+
+    staff_profile: Mapped["StaffProfile"] = relationship(back_populates="weekly_availability")
+
+
+class SalonCustomer(TimestampMixin, Base):
+    """Tenant-scoped customer record."""
+
+    __tablename__ = "salon_customers"
+    __table_args__ = (UniqueConstraint("salon_id", "email", name="uq_salon_customers_salon_email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    salon_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("salons.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    notes: Mapped[str] = mapped_column(String(1000), nullable=True)
+
+    salon: Mapped["Salon"] = relationship(back_populates="customers")

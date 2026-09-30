@@ -32,7 +32,7 @@ def test_migrations_upgrade_configured_development_database_to_head() -> None:
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
 
-    assert revision == "2317437c36e3"
+    assert revision == "5497f90af712"
 
 
 def test_migrations_upgrade_clean_database_to_head() -> None:
@@ -79,7 +79,7 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
                 ).fetchall()
             }
 
-        assert revision == ("2317437c36e3",)
+        assert revision == ("5497f90af712",)
         assert {
             "platform_metadata",
             "users",
@@ -88,6 +88,11 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
             "auth_sessions",
             "salon_invitations",
             "password_reset_tokens",
+            "salon_services",
+            "staff_profiles",
+            "staff_service_assignments",
+            "staff_weekly_availability",
+            "salon_customers",
         }.issubset(tables)
     finally:
         with psycopg.connect(**connection_kwargs) as connection:
