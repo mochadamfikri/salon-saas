@@ -3,7 +3,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from app.core.security import hash_password
 from app.core.tokens import hash_token
 from app.main import app
@@ -26,7 +25,9 @@ def _create_user_and_login(db: Session, email: str) -> tuple[User, str]:
 
 def _create_salon(token: str, name: str = "Test Salon") -> dict:
     """Helper: create salon and return response."""
-    response = client.post("/salons", headers={"Authorization": f"Bearer {token}"}, json={"name": name})
+    response = client.post(
+        "/salons", headers={"Authorization": f"Bearer {token}"}, json={"name": name}
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -146,13 +147,19 @@ def test_accept_invitation_creates_membership(db_session: Session):
     )
 
     assert accept_response.status_code == 200
-    membership_data = accept_response.json()
-    assert membership_data["role"] == "staff"
-    assert membership_data["status"] == "active"
+    data = accept_response.json()
+    assert "membership" in data
+    assert "salon" in data
+    assert data["membership"]["role"] == "staff"
+    assert data["membership"]["status"] == "active"
+    # The salon is the invitation's salon, loaded server-side.
+    assert data["salon"]["id"] == salon["id"]
+    assert data["salon"]["name"] == "Accept Salon"
+    assert data["salon"]["slug"] == salon["slug"]
 
 
 def test_accept_invitation_email_mismatch(db_session: Session):
-    """Test accepting invitation with wrong email fails."""
+    """Test accepting invitation with wrong email returns 422."""
     owner_user, owner_token = _create_user_and_login(db_session, "owner-mismatch@example.com")
     salon = _create_salon(owner_token, "Mismatch Salon")
 
@@ -173,7 +180,8 @@ def test_accept_invitation_email_mismatch(db_session: Session):
         json={"token": raw_token},
     )
 
-    assert accept_response.status_code == 404
+    assert accept_response.status_code == 422
+    assert "mismatch" in accept_response.json()["detail"].lower()
 
 
 def test_accept_invitation_already_member(db_session: Session):
@@ -230,7 +238,8 @@ def test_accept_expired_invitation(db_session: Session):
         json={"token": raw_token},
     )
 
-    assert accept_response.status_code == 404
+    assert accept_response.status_code == 410
+    assert "expir" in accept_response.json()["detail"].lower()
 
 
 def test_revoke_invitation(db_session: Session):
@@ -281,7 +290,8 @@ def test_accept_revoked_invitation(db_session: Session):
         json={"token": raw_token},
     )
 
-    assert accept_response.status_code == 404
+    assert accept_response.status_code == 410
+    assert "revok" in accept_response.json()["detail"].lower()
 
 
 def test_list_invitations(db_session: Session):
@@ -335,3 +345,157 @@ def test_cross_tenant_invitation_revoke_404(db_session: Session):
     )
 
     assert revoke_response.status_code == 404
+
+
+def _create_invitation(owner_token: str, salon_id: str, email: str, role: str = "staff") -> str:
+    """Helper: create invitation and return the raw token."""
+    response = client.post(
+        f"/salons/{salon_id}/invitations",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"email": email, "role": role},
+    )
+    assert response.status_code == 201
+    return response.json()["token"]
+
+
+def test_accept_invitation_invalid_token_returns_404(db_session: Session):
+    """Unknown token -> 404 (not collapsed with other lifecycle failures)."""
+    _, invitee_token = _create_user_and_login(db_session, "invalid-token-user@example.com")
+
+    response = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {invitee_token}"},
+        json={"token": "definitely-not-a-real-token"},
+    )
+
+    assert response.status_code == 404
+    assert "invitation" in response.json()["detail"].lower()
+
+
+def test_accept_invitation_unauthenticated_returns_401(db_session: Session):
+    """Missing credentials -> 401."""
+    response = client.post("/invitations/accept", json={"token": "any-token"})
+
+    assert response.status_code == 401
+
+
+def test_accept_invitation_already_accepted_returns_409(db_session: Session):
+    """Second redemption of the same token -> 409 (one-time acceptance)."""
+    owner_user, owner_token = _create_user_and_login(db_session, "owner-accept-twice@example.com")
+    salon = _create_salon(owner_token, "Accept Twice Salon")
+
+    _, invitee_token = _create_user_and_login(db_session, "twice-invitee@example.com")
+    raw_token = _create_invitation(owner_token, salon["id"], "twice-invitee@example.com")
+
+    first = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {invitee_token}"},
+        json={"token": raw_token},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {invitee_token}"},
+        json={"token": raw_token},
+    )
+    assert second.status_code == 409
+    assert "already accepted" in second.json()["detail"].lower()
+
+
+def test_accept_invitation_returns_invitation_salon_not_client_choice(db_session: Session):
+    """Success salon is the invitation's salon, loaded server-side.
+
+    The accept endpoint takes no salon_id; even with two salons in play the
+    response must carry the salon the invitation was issued for.
+    """
+    owner_user, owner_token = _create_user_and_login(db_session, "owner-two-salons@example.com")
+    salon_a = _create_salon(owner_token, "Salon A Invite")
+    salon_b = _create_salon(owner_token, "Salon B Invite")
+
+    _, invitee_token = _create_user_and_login(db_session, "two-salon-invitee@example.com")
+    raw_token = _create_invitation(owner_token, salon_b["id"], "two-salon-invitee@example.com")
+
+    response = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {invitee_token}"},
+        json={"token": raw_token},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["salon"]["id"] == salon_b["id"]
+    assert data["salon"]["id"] != salon_a["id"]
+    assert data["membership"]["role"] == "staff"
+
+
+def test_accept_invitation_email_case_insensitive(db_session: Session):
+    """Invitation email matching is normalized (case-insensitive)."""
+    owner_user, owner_token = _create_user_and_login(db_session, "owner-case@example.com")
+    salon = _create_salon(owner_token, "Case Salon")
+
+    _, invitee_token = _create_user_and_login(db_session, "case-invitee@example.com")
+    raw_token = _create_invitation(owner_token, salon["id"], "Case-Invitee@Example.COM")
+
+    response = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {invitee_token}"},
+        json={"token": raw_token},
+    )
+
+    assert response.status_code == 200
+
+
+def test_invitation_token_stored_hash_only(db_session: Session):
+    """Raw invitation token is never persisted; only its hash is stored."""
+    owner_user, owner_token = _create_user_and_login(db_session, "owner-hashonly@example.com")
+    salon = _create_salon(owner_token, "Hash Only Salon")
+
+    invite_response = client.post(
+        f"/salons/{salon['id']}/invitations",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"email": "hashonly@example.com", "role": "staff"},
+    )
+    invitation_id = invite_response.json()["invitation_id"]
+    raw_token = invite_response.json()["token"]
+
+    invitation = db_session.get(SalonInvitation, uuid.UUID(invitation_id))
+    assert invitation is not None
+    assert invitation.token_hash != raw_token
+    assert raw_token not in invitation.token_hash
+    assert invitation.token_hash == hash_token(raw_token)
+
+    # The raw token never appears in the list representation either.
+    list_response = client.get(
+        f"/salons/{salon['id']}/invitations",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert raw_token not in list_response.text
+
+
+def test_duplicate_membership_rejection_does_not_consume_invitation(db_session: Session):
+    """409 duplicate rejection leaves the invitation redeemable (not consumed)."""
+    owner_user, owner_token = _create_user_and_login(db_session, "owner-noconsume@example.com")
+    salon = _create_salon(owner_token, "No Consume Salon")
+
+    existing_user, existing_token = _create_user_and_login(db_session, "noconsume@example.com")
+    _add_membership(db_session, salon["id"], existing_user.id, "staff")
+
+    invite_response = client.post(
+        f"/salons/{salon['id']}/invitations",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"email": "noconsume@example.com", "role": "manager"},
+    )
+    invitation_id = invite_response.json()["invitation_id"]
+    raw_token = invite_response.json()["token"]
+
+    accept_response = client.post(
+        "/invitations/accept",
+        headers={"Authorization": f"Bearer {existing_token}"},
+        json={"token": raw_token},
+    )
+    assert accept_response.status_code == 409
+
+    invitation = db_session.get(SalonInvitation, uuid.UUID(invitation_id))
+    assert invitation is not None
+    assert invitation.accepted_at is None

@@ -1,6 +1,7 @@
 """Shared pytest fixtures with transaction-isolated database access."""
 
 from collections.abc import Generator
+from types import SimpleNamespace
 
 import pytest
 from app.core.dependencies import get_db
@@ -9,6 +10,20 @@ from app.main import app
 from sqlalchemy import event
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, sessionmaker
+
+
+@pytest.fixture(autouse=True)
+def _disable_rate_limiting(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable Redis rate limiting for the general suite.
+
+    The shared TestClient peer IP would otherwise exhaust the per-minute
+    buckets across unrelated tests. tests/test_rate_limit.py re-enables the
+    limiter with fakeredis for its own coverage.
+    """
+    monkeypatch.setattr(
+        "app.core.rate_limit.get_settings",
+        lambda: SimpleNamespace(rate_limit_enabled=False),
+    )
 
 
 @pytest.fixture(scope="function")

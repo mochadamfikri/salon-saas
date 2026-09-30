@@ -14,7 +14,9 @@ client = TestClient(app)
 
 def test_password_reset_request_existing_user(db_session: Session):
     """Test password reset request for existing user returns generic success."""
-    user = User(email="reset@example.com", password_hash=hash_password("OldPass123"), is_active=True)
+    user = User(
+        email="reset@example.com", password_hash=hash_password("OldPass123"), is_active=True
+    )
     db_session.add(user)
     db_session.commit()
 
@@ -24,14 +26,18 @@ def test_password_reset_request_existing_user(db_session: Session):
     assert "email exists" in response.json()["message"].lower()
 
     # Verify token created in database
-    token = db_session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).first()
+    token = (
+        db_session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).first()
+    )
     assert token is not None
     assert token.used_at is None
 
 
 def test_password_reset_request_nonexistent_user(db_session: Session):
     """Test password reset request for nonexistent user returns same generic response."""
-    response = client.post("/auth/password-reset/request", json={"email": "nonexistent@example.com"})
+    response = client.post(
+        "/auth/password-reset/request", json={"email": "nonexistent@example.com"}
+    )
 
     assert response.status_code == 200
     assert "email exists" in response.json()["message"].lower()
@@ -51,23 +57,31 @@ def test_password_reset_request_inactive_user(db_session: Session):
     db_session.add(user)
     db_session.commit()
 
-    response = client.post("/auth/password-reset/request", json={"email": "inactive-reset@example.com"})
+    response = client.post(
+        "/auth/password-reset/request", json={"email": "inactive-reset@example.com"}
+    )
 
     assert response.status_code == 200
 
     # Verify no token created for inactive user
-    token = db_session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).first()
+    token = (
+        db_session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).first()
+    )
     assert token is None
 
 
 def test_password_reset_confirm_success(db_session: Session):
     """Test successful password reset with valid token."""
-    user = User(email="confirm@example.com", password_hash=hash_password("OldPass123"), is_active=True)
+    user = User(
+        email="confirm@example.com", password_hash=hash_password("OldPass123"), is_active=True
+    )
     db_session.add(user)
     db_session.commit()
 
     # Request reset
-    request_response = client.post("/auth/password-reset/request", json={"email": "confirm@example.com"})
+    request_response = client.post(
+        "/auth/password-reset/request", json={"email": "confirm@example.com"}
+    )
     assert request_response.status_code == 200
 
     # Get raw token from database (in production this would be emailed)
@@ -117,7 +131,9 @@ def test_password_reset_confirm_invalid_token(db_session: Session):
 
 def test_password_reset_confirm_expired_token(db_session: Session):
     """Test password reset with expired token fails."""
-    user = User(email="expired@example.com", password_hash=hash_password("OldPass123"), is_active=True)
+    user = User(
+        email="expired@example.com", password_hash=hash_password("OldPass123"), is_active=True
+    )
     db_session.add(user)
     db_session.commit()
 
@@ -171,7 +187,11 @@ def test_password_reset_confirm_already_used_token(db_session: Session):
 
 def test_password_reset_revokes_existing_sessions(db_session: Session):
     """Test successful password reset revokes all existing sessions."""
-    user = User(email="revoke-sessions@example.com", password_hash=hash_password("OldPass123"), is_active=True)
+    user = User(
+        email="revoke-sessions@example.com",
+        password_hash=hash_password("OldPass123"),
+        is_active=True,
+    )
     db_session.add(user)
     db_session.commit()
 
@@ -225,7 +245,9 @@ def test_password_reset_revokes_existing_sessions(db_session: Session):
 
 def test_password_reset_weak_password_rejected(db_session: Session):
     """Test password reset with weak password fails validation."""
-    user = User(email="weak-pass@example.com", password_hash=hash_password("OldPass123"), is_active=True)
+    user = User(
+        email="weak-pass@example.com", password_hash=hash_password("OldPass123"), is_active=True
+    )
     db_session.add(user)
     db_session.commit()
 
@@ -246,3 +268,57 @@ def test_password_reset_weak_password_rejected(db_session: Session):
     )
 
     assert response.status_code == 422  # Pydantic validation
+
+
+def test_password_reset_invalidates_refresh_token_end_to_end(db_session: Session):
+    """After a successful reset, the pre-reset refresh token is rejected (401)."""
+    user = User(
+        email="e2e-invalidate@example.com",
+        password_hash=hash_password("OldPass123"),
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_response = client.post(
+        "/auth/login",
+        json={"email": "e2e-invalidate@example.com", "password": "OldPass123"},
+    )
+    assert login_response.status_code == 200
+    old_refresh_token = login_response.json()["refresh_token"]
+
+    # Sanity: the refresh token works before the reset.
+    refresh_response = client.post("/auth/refresh", json={"refresh_token": old_refresh_token})
+    assert refresh_response.status_code == 200
+    rotated_refresh_token = refresh_response.json()["refresh_token"]
+
+    # Create a reset token directly (production would email the raw token).
+    from app.core.tokens import generate_opaque_token, hash_token
+
+    raw_token = generate_opaque_token()
+    db_session.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_token),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+    )
+    db_session.commit()
+
+    confirm_response = client.post(
+        "/auth/password-reset/confirm",
+        json={"token": raw_token, "new_password": "BrandNewPass123"},
+    )
+    assert confirm_response.status_code == 200
+
+    # Both the original and the rotated refresh token are now dead.
+    for dead_token in (old_refresh_token, rotated_refresh_token):
+        dead_response = client.post("/auth/refresh", json={"refresh_token": dead_token})
+        assert dead_response.status_code == 401
+
+    # The new password works for login.
+    relogin_response = client.post(
+        "/auth/login",
+        json={"email": "e2e-invalidate@example.com", "password": "BrandNewPass123"},
+    )
+    assert relogin_response.status_code == 200

@@ -87,7 +87,7 @@ def test_manager_can_demote_staff_only(owned_salon: tuple[dict[str, Any], str, S
 
 
 def test_manager_cannot_promote_staff_to_manager(
-    owned_salon: tuple[dict[str, Any], str, Session]
+    owned_salon: tuple[dict[str, Any], str, Session],
 ) -> None:
     salon, _, db = owned_salon
     _, _, manager_token = _add_membership(db, salon["id"], "manager", "manager-promote@example.com")
@@ -135,7 +135,7 @@ def test_create_salon_without_slug_generates_safe_unique_slug(db_session: Sessio
 
 
 def test_suspended_member_gets_same_404_as_non_member(
-    owned_salon: tuple[dict[str, Any], str, Session]
+    owned_salon: tuple[dict[str, Any], str, Session],
 ) -> None:
     salon, _, db = owned_salon
     _, membership, suspended_token = _add_membership(
@@ -240,7 +240,7 @@ def test_owner_cannot_suspend_owner(owned_salon: tuple[dict[str, Any], str, Sess
 
 
 def test_cross_tenant_membership_id_is_hidden(
-    owned_salon: tuple[dict[str, Any], str, Session]
+    owned_salon: tuple[dict[str, Any], str, Session],
 ) -> None:
     salon, owner_token, db = owned_salon
     other_user, other_token = _create_user_and_token(db, "other-tenant-owner@example.com")
