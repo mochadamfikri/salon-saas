@@ -61,7 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!nameCheck.valid) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: nameCheck.error, field: "name" },
-      { status: 400 },
+      { status: 422 },
     );
   }
   // Slug is optional: blank means the backend auto-generates it. An
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!slugCheck.valid) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: slugCheck.error, field: "slug" },
-      { status: 400 },
+      { status: 422 },
     );
   }
 

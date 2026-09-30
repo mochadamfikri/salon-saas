@@ -98,7 +98,7 @@ describe("POST /api/salons", () => {
     const fetchMock = vi.fn(async () => jsonResponse(201, {}));
     vi.stubGlobal("fetch", fetchMock);
     const res = await POST(authedPost({ name: "Glow", slug: "BAD SLUG" }, AUTH));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect((await res.json()).field).toBe("slug");
     expect(fetchMock).not.toHaveBeenCalled();
   });

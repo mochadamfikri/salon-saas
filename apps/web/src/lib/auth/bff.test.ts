@@ -223,6 +223,7 @@ describe("bffErrorResponse", () => {
   it("maps codes to HTTP statuses and merges extra fields", () => {
     expect(bffErrorResponse("invalid_credentials", "m").status).toBe(401);
     expect(bffErrorResponse("email_taken", "m").status).toBe(400);
+    expect(bffErrorResponse("slug_taken", "m").status).toBe(400);
     expect(bffErrorResponse("invitation_expired", "m").status).toBe(410);
     expect(bffErrorResponse("invitation_already_accepted", "m").status).toBe(409);
     expect(bffErrorResponse("invitation_duplicate_membership", "m").status).toBe(409);
@@ -231,6 +232,15 @@ describe("bffErrorResponse", () => {
     expect(bffErrorResponse("unknown_error", "m").status).toBe(500);
     const withState = bffErrorResponse("invitation_expired", "m", { state: "expired" }, 503);
     expect(withState.status).toBe(503);
+  });
+
+  it("maps account_inactive to 403 (backend: 403 'Account is not active')", () => {
+    const res = bffErrorResponse("account_inactive", "m");
+    expect(res.status).toBe(403);
+  });
+
+  it("maps generic validation_error to 422 (backend: FastAPI/Pydantic 422)", () => {
+    expect(bffErrorResponse("validation_error", "m").status).toBe(422);
   });
 
   it("carries no token fields in error payloads", async () => {

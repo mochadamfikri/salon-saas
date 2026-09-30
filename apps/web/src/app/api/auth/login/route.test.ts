@@ -76,11 +76,20 @@ describe("POST /api/auth/login", () => {
     expect(res.cookies.get(ACCESS_COOKIE)).toBeUndefined();
   });
 
+  it("forwards a backend 403 for inactive accounts (not a 401)", async () => {
+    stubBackend({ login: jsonResponse(403, { detail: "Account is not active" }) });
+    const res = await POST(post({ email: "user@example.com", password: "x".repeat(12) }));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, code: "account_inactive" });
+    expect(res.cookies.get(ACCESS_COOKIE)).toBeUndefined();
+  });
+
   it("rejects malformed input before touching the backend", async () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, {}));
     vi.stubGlobal("fetch", fetchMock);
     const res = await POST(post({ email: "not-an-email", password: "x".repeat(12) }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.field).toBe("email");
     expect(fetchMock).not.toHaveBeenCalled();

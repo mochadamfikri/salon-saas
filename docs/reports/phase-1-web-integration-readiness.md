@@ -29,7 +29,7 @@ Cookie lifetimes match the backend exactly: access 15 min, refresh 30 days.
 
 | | Backend | BFF | UI |
 |---|---|---|---|
-| Request | `{ email, password }` (OAuth2PasswordRequestForm) | same | Same validation as register |
+| Request | `{ email, password }` JSON (`LoginRequest`) | same | Same validation as register |
 | Success | 200 `{ access_token, refresh_token }` | 200 `{ ok: true, user }` + cookies | Redirects to `/dashboard` |
 | Bad creds | 401 "Invalid email or password" | 401, code `invalid_credentials` | **Generic message, no user-enumeration oracle:** "Invalid email or password." |
 | Inactive account | 403 "Account is not active" | 403, code `account_inactive` | "Your account is not active. Please contact support." |
@@ -55,14 +55,14 @@ cookies are untouched.
 - The inline-refresh path (`authorizedCallWithTokens`) behaves identically:
   429 → `rate_limited` + `retryAfterSeconds`, no `sessionInvalidated`.
 
-### 1.5 Salons — `GET /my-salons`, `POST /salons` (backend) ← `/api/salons` (BFF) ← `/onboarding` (page)
+### 1.5 Salons — `GET /me/salons`, `POST /salons` (backend) ← `/api/salons` (BFF) ← `/onboarding` (page)
 
-- `GET /my-salons` → list; `POST /salons { name, slug? }` → 201
+- `GET /me/salons` → list; `POST /salons { name, slug? }` → 201
   `SalonResponse{ id, name, slug, status }` (status: `onboarding|active|suspended`).
-- Slug conflict: 400 "Slug already taken" → BFF code `slug_taken` → field
-  message on the onboarding form.
+- Slug conflict: backend 400 "Salon slug already exists" → BFF code `slug_taken`
+  → field message on the onboarding form ("That salon URL is already taken. Try another one.").
 
-### 1.6 Invitation accept — `POST /invitations/accept` (backend) ← `POST /api/invitations/accept` (BFF) ← `/invite/[token]` (page)
+### 1.6 Invitation accept — `POST /invitations/accept` (backend) ← `POST /api/invitations/accept` (BFF) ← `/invite/accept` (page)
 
 The canonical contract (backend Checkpoint D, live):
 
@@ -136,12 +136,17 @@ all green (2026-09-30).
 1. **Password reset UI does not exist.** The backend endpoints are
    foundation-only: with no email provider wired, the reset token is only
    recoverable from the database, so the flow cannot work end-to-end. Building
-   UI now would be scope creep. Scheduled for Checkpoint E / Phase 2.
+   UI now would be scope creep. Backend Phase 1 provides the foundation; the
+   UI is not in the frontend Phase 1 acceptance scope. There is no owner
+   decision scheduling it for a later phase.
 2. **Invitation management UI does not exist** (create/list/revoke). Accept-only
    is in Phase 1 scope.
-3. **Invite continuation is best-effort server-side.** The raw token is parked
-   under a random nonce in server memory (not a cookie/store); a server restart
-   between "continue" and login drops the pending invitation and the user must
+3. **Invite continuation is Redis-backed, not server memory.** The raw token
+   is parked in `RedisInviteContinuationStore` under a `crypto.randomUUID()`
+   nonce, with a 10-minute TTL (enforced by Redis PX) and single-use consume
+   via an atomic Lua GET+DEL (concurrent consumers cannot double-consume).
+   Caveat: the continuation expires after 10 minutes, and if Redis is
+   unavailable the pending invitation cannot be resumed — the user must
    re-open the invite link.
 4. **429 UX is honest but dumb.** We surface the backend's Retry-After wait in
    the message; there is no client-side countdown or auto-retry.

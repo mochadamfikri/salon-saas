@@ -65,7 +65,7 @@ describe("POST /api/auth/register", () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, {}));
     vi.stubGlobal("fetch", fetchMock);
     const res = await POST(post({ email: "new@example.com", password: "too-short" }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect((await res.json()).field).toBe("password");
     expect(fetchMock).not.toHaveBeenCalled();
   });

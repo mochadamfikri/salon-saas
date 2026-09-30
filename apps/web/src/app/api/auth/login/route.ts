@@ -29,13 +29,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!emailCheck.valid) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: emailCheck.error, field: "email" },
-      { status: 400 },
+      { status: 422 },
     );
   }
   if (!password) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: "Password is required.", field: "password" },
-      { status: 400 },
+      { status: 422 },
     );
   }
 

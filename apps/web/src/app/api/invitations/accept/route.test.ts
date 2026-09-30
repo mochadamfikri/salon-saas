@@ -100,7 +100,7 @@ describe("POST /api/invitations/accept", () => {
     const fetchMock = vi.fn(async () => jsonResponse(200, {}));
     vi.stubGlobal("fetch", fetchMock);
     const res = await POST(accept({}, AUTH));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

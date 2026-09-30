@@ -31,7 +31,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!token) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: "Invitation token is required.", field: "token" },
-      { status: 400 },
+      { status: 422 },
     );
   }
 

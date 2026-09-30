@@ -222,10 +222,9 @@ export function bffErrorResponse(
     statusOverride ??
     (code === "unauthorized" ||
     code === "invalid_refresh_token" ||
-    code === "invalid_credentials" ||
-    code === "account_inactive"
+    code === "invalid_credentials"
       ? 401
-      : code === "forbidden"
+      : code === "forbidden" || code === "account_inactive"
         ? 403
         : code === "not_found" ||
             code === "salon_not_found" ||
@@ -236,9 +235,9 @@ export function bffErrorResponse(
             : code === "invitation_already_accepted" ||
                 code === "invitation_duplicate_membership"
               ? 409
-              : code === "email_taken" || code === "slug_taken" || code === "validation_error"
+              : code === "email_taken" || code === "slug_taken"
                 ? 400
-                : code === "invitation_email_mismatch"
+                : code === "validation_error" || code === "invitation_email_mismatch"
                   ? 422
                   : code === "rate_limited"
                     ? 429

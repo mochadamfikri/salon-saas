@@ -34,14 +34,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!emailCheck.valid) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: emailCheck.error, field: "email" },
-      { status: 400 },
+      { status: 422 },
     );
   }
   const passwordCheck = validatePassword(password);
   if (!passwordCheck.valid) {
     return NextResponse.json(
       { ok: false, code: "validation_error", message: passwordCheck.error, field: "password" },
-      { status: 400 },
+      { status: 422 },
     );
   }
 
