@@ -8,46 +8,54 @@ Checkpoint A-D PASS.
 Checkpoint E belum selesai.
 
 ## Phase 2 Status
-**P2-A AUDIT REMEDIATION COMPLETED** ✓
+**P2-B SERVICE CATALOG API COMPLETED** ✓
 
-### Audit Status
-- Initial submission: BLOCKED (remote HEAD 84529b9)
-- Remediation: COMPLETED
-- Awaiting: Auditor re-review
+### Completed Checkpoints
+- ✓ P2-A: Schema/Models/Migration (audited, remediated, PASS)
+- ✓ P2-B: Service Catalog API + RBAC + Tests
 
-### P2-A Remediation Deliverables
-- ✓ Contract-compliant schema (all audit findings addressed)
-- ✓ Migration 547d2dd43298 (clean, reversible)
-- ✓ 20 contract compliance tests
-- ✓ 129 total tests PASS (Phase 1 regression + Phase 2)
+### P2-B Deliverables
+- ✓ Service Catalog API (POST/GET/PATCH + activate/deactivate)
+- ✓ RBAC enforcement (Owner/Manager mutation, Staff read-only)
+- ✓ Tenant isolation (cross-tenant 404, suspended denied)
+- ✓ Contract validation (duration>0, price>=0, currency default IDR)
+- ✓ 12 P2-B tests + 141 total tests PASS
 - ✓ Ruff + format PASS
 
-### Schema Changes (Audit Remediation)
-1. **salon_services**
-   - Added: category (opt), currency DEFAULT 'IDR'
-   - Added: CHECK(duration_minutes > 0), CHECK(price_amount >= 0)
-   - Fixed: price_amount typing (Decimal)
-   - Removed: UNIQUE(salon_id, name)
+### Endpoints (P2-B)
+```
+POST   /salons/{salon_id}/services
+GET    /salons/{salon_id}/services
+GET    /salons/{salon_id}/services/{service_id}
+PATCH  /salons/{salon_id}/services/{service_id}
+POST   /salons/{salon_id}/services/{service_id}/activate
+POST   /salons/{salon_id}/services/{service_id}/deactivate
+```
 
-2. **staff_profiles**
-   - Added: phone (opt)
-   - Fixed: display_name now optional
-   - Documented: SalonMembership is authoritative source
+### RBAC Matrix (Service Catalog)
+| Action          | Owner | Manager | Staff |
+|-----------------|-------|---------|-------|
+| Create service  | ✓     | ✓       | ✗     |
+| Read service    | ✓     | ✓       | ✓     |
+| Update service  | ✓     | ✓       | ✗     |
+| Activate        | ✓     | ✓       | ✗     |
+| Deactivate      | ✓     | ✓       | ✗     |
 
-3. **staff_weekly_availability**
-   - Changed: day_of_week 0-6 (was 1-7)
-   - Added: CHECK(start_time < end_time), is_available boolean
-   - Documented: UNIQUE prevents exact duplicates only, NOT overlap
+### Test Coverage (P2-B)
+- Owner/Manager create service (with defaults & optional fields)
+- Staff create denied (403)
+- Owner/Manager update service
+- Staff update denied (403)
+- Owner/Manager activate/deactivate lifecycle
+- Staff activate/deactivate denied (403)
+- Staff read service & list (success)
+- Cross-tenant isolation (404)
+- Suspended membership denied (404)
+- Invalid duration rejected (422)
+- Negative price rejected (422)
+- Client cannot override salon_id (path authority)
 
-4. **salon_customers**
-   - Fixed: email and phone now optional
-   - Removed: UNIQUE(salon_id, email)
-
-5. **Tenant isolation**
-   - Clarified: Application-layer invariant (P2-C enforcement)
-   - Database provides FK relationships only
-
-### Tables (Final Schema)
+### Schema (P2-A - Unchanged)
 1. **salon_services** - layanan salon
    - CHECK(duration_minutes > 0)
    - CHECK(price_amount >= 0)
@@ -71,12 +79,12 @@ Checkpoint E belum selesai.
    - No uniqueness constraints
 
 ## Next Action
-**STOP - DO NOT START P2-B**
+**STOP - AWAITING AUDIT**
 
-Awaiting auditor re-review of remediation.
-
-After audit PASS:
-- P2-B: Service & Staff Management API Endpoints
+After P2-B audit PASS:
+- P2-C: Staff Profile + Staff-Service Assignment API
+- P2-D: Weekly Availability API
+- P2-E: Customer Records API
 
 ## Rules (Masih Berlaku)
 - semua tenant-scoped via salon_id
@@ -88,8 +96,8 @@ After audit PASS:
 - jangan production
 
 ## Last Commits
+SHA: (pending) - feat(phase2): P2-B service catalog API + RBAC + tests
+SHA: a9d603c - docs: P2-A audit remediation completion report
 SHA: 5e573e3 - style: format migration file
-SHA: 13a775d - fix(phase2): P2-A audit remediation - contract-compliant schema
-SHA: 91755ee - fix(phase2): P2-A audit remediation - contract-compliant schema (pre-format)
 
-**Remote HEAD:** 5e573e3cd39e9831bc62c4647a40a2727f2ef26c
+**Remote HEAD:** a9d603cc705d1471cb0b214e24bc50ec24f28998
