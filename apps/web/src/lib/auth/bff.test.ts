@@ -134,6 +134,32 @@ describe("authorizedCallWithTokens", () => {
     if (!outcome.result.ok) expect(outcome.result.code).toBe("forbidden");
     expect(outcome.refreshedTokens).toBeUndefined();
   });
+
+  it("does not invalidate the session when the refresh is rate limited", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        return new Response(JSON.stringify({ detail: "Too many requests." }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after": "30" },
+        });
+      }
+      return jsonResponse(401, { detail: "Token has expired" });
+    }) as unknown as typeof fetch;
+    const backend = createBackendClient(fetchImpl);
+    const outcome = await authorizedCallWithTokens(
+      { backend, tokens: { accessToken: "stale", refreshToken: "rt1" } },
+      (token) => backend.getMe(token),
+    );
+    expect(outcome.result.ok).toBe(false);
+    if (!outcome.result.ok) {
+      expect(outcome.result.code).toBe("rate_limited");
+      expect(outcome.result.status).toBe(429);
+      expect(outcome.result.retryAfterSeconds).toBe(30);
+    }
+    // A 429 is not a dead session: the caller must NOT clear cookies.
+    expect(outcome.sessionInvalidated).toBeUndefined();
+    expect(outcome.refreshedTokens).toBeUndefined();
+  });
 });
 
 describe("authorizedCall (request variant)", () => {
@@ -199,6 +225,7 @@ describe("bffErrorResponse", () => {
     expect(bffErrorResponse("email_taken", "m").status).toBe(400);
     expect(bffErrorResponse("invitation_expired", "m").status).toBe(410);
     expect(bffErrorResponse("invitation_already_accepted", "m").status).toBe(409);
+    expect(bffErrorResponse("invitation_duplicate_membership", "m").status).toBe(409);
     expect(bffErrorResponse("invitation_email_mismatch", "m").status).toBe(422);
     expect(bffErrorResponse("network_error", "m").status).toBe(502);
     expect(bffErrorResponse("unknown_error", "m").status).toBe(500);

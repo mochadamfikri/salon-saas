@@ -20,7 +20,7 @@ import {
   bffErrorResponse,
   createBackendClient,
 } from "@/lib/auth/bff";
-import { uiMessageFor } from "@/lib/auth/ui-messages";
+import { errorMessageFor } from "@/lib/auth/ui-messages";
 import { validateOptionalSlug, validateSalonName } from "@/lib/auth/validation";
 import type { BackendSalonCreateRequest } from "@/lib/auth/contracts";
 
@@ -32,7 +32,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   );
 
   if (!outcome.result.ok) {
-    const err = bffErrorResponse(outcome.result.code, uiMessageFor(outcome.result.code));
+    const err = bffErrorResponse(
+      outcome.result.code,
+      errorMessageFor(outcome.result.code, outcome.result.retryAfterSeconds),
+    );
     applySessionOutcome(err, outcome);
     return err;
   }
@@ -79,7 +82,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
 
   if (!outcome.result.ok) {
-    const err = bffErrorResponse(outcome.result.code, uiMessageFor(outcome.result.code));
+    const err = bffErrorResponse(
+      outcome.result.code,
+      errorMessageFor(outcome.result.code, outcome.result.retryAfterSeconds),
+    );
     applySessionOutcome(err, outcome);
     return err;
   }

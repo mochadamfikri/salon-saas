@@ -32,8 +32,21 @@ describe("mapBackendError", () => {
     expect(mapBackendError(404, "Invitation not found")).toBe("invitation_invalid");
     expect(mapBackendError(410, "Invitation expired")).toBe("invitation_expired");
     expect(mapBackendError(410, "Invitation revoked")).toBe("invitation_revoked");
-    expect(mapBackendError(409, "Invitation already accepted")).toBe("invitation_already_accepted");
+    expect(mapBackendError(409, "Invitation has already been accepted")).toBe("invitation_already_accepted");
+    expect(
+      mapBackendError(409, "User already has an active membership in this salon"),
+    ).toBe("invitation_duplicate_membership");
     expect(mapBackendError(422, "Invitation email mismatch")).toBe("invitation_email_mismatch");
+  });
+
+  it("keeps already-accepted distinct from duplicate membership on 409", () => {
+    // Both are 409 but need different UX; never collapse to unknown_error.
+    expect(mapBackendError(409, "Invitation has already been accepted")).toBe(
+      "invitation_already_accepted",
+    );
+    expect(mapBackendError(409, "User already has an active membership in this salon")).toBe(
+      "invitation_duplicate_membership",
+    );
   });
 });
 
@@ -104,6 +117,44 @@ describe("BackendClient", () => {
     const result = await client.acceptInvitation("at", { token: "raw" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("invitation_invalid");
+  });
+
+  it("captures the Retry-After header on 429 responses", async () => {
+    const fetchImpl = mockFetch(
+      () =>
+        new Response(JSON.stringify({ detail: "Too many requests. Please wait a moment and try again." }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after": "45" },
+        }),
+    );
+    const client = new BackendClient({ baseUrl: "https://api.test", fetchImpl });
+    const result = await client.login({ email: "a@b.com", password: "x".repeat(12) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("rate_limited");
+      expect(result.retryAfterSeconds).toBe(45);
+    }
+  });
+
+  it("ignores a missing or invalid Retry-After header", async () => {
+    for (const retryAfter of [null, "soon", "-5", "0"]) {
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (retryAfter !== null) headers["retry-after"] = retryAfter;
+      const fetchImpl = mockFetch(
+        () =>
+          new Response(JSON.stringify({ detail: "Too many requests." }), {
+            status: 429,
+            headers,
+          }),
+      );
+      const client = new BackendClient({ baseUrl: "https://api.test", fetchImpl });
+      const result = await client.login({ email: "a@b.com", password: "x".repeat(12) });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("rate_limited");
+        expect(result.retryAfterSeconds).toBeUndefined();
+      }
+    }
   });
 
   it("creates a salon with name and slug", async () => {

@@ -21,6 +21,8 @@ const MESSAGES: Record<BackendErrorCode, string> = {
   invitation_expired: "This invitation has expired. Ask for a new one.",
   invitation_revoked: "This invitation was revoked. Ask for a new one.",
   invitation_already_accepted: "This invitation was already accepted.",
+  invitation_duplicate_membership:
+    "You are already a member of this salon. No need to accept again.",
   invitation_email_mismatch:
     "This invitation was sent to a different email address. Log in with the invited email.",
   invitation_unavailable:
@@ -39,6 +41,35 @@ export function uiMessageFor(code: BackendErrorCode): string {
   return MESSAGES[code] ?? MESSAGES.unknown_error;
 }
 
+/**
+ * Sensible user-facing message for a 429 rate-limit response.
+ * Uses the backend's `Retry-After` value (seconds) when available so the
+ * user knows how long to wait; falls back to the generic message otherwise.
+ */
+export function rateLimitedMessage(retryAfterSeconds?: number): string {
+  if (retryAfterSeconds !== undefined && retryAfterSeconds > 0) {
+    if (retryAfterSeconds >= 60) {
+      const minutes = Math.round(retryAfterSeconds / 60);
+      return `Too many attempts. Please try again in about ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+    }
+    return `Too many attempts. Please try again in ${retryAfterSeconds} seconds.`;
+  }
+  return MESSAGES.rate_limited;
+}
+
+/**
+ * Message for a failed backend call: honors the `Retry-After` hint on
+ * 429s, generic safe message otherwise. Prefer this over `uiMessageFor`
+ * at call sites that have the backend result in scope.
+ */
+export function errorMessageFor(
+  code: BackendErrorCode,
+  retryAfterSeconds?: number,
+): string {
+  if (code === "rate_limited") return rateLimitedMessage(retryAfterSeconds);
+  return uiMessageFor(code);
+}
+
 /** InvitationState for a backend error code (used by the invite flow). */
 export function invitationStateFor(code: BackendErrorCode): InvitationState {
   switch (code) {
@@ -48,6 +79,8 @@ export function invitationStateFor(code: BackendErrorCode): InvitationState {
       return "revoked";
     case "invitation_already_accepted":
       return "already_accepted";
+    case "invitation_duplicate_membership":
+      return "already_member";
     case "invitation_email_mismatch":
       return "email_mismatch";
     case "invitation_invalid":

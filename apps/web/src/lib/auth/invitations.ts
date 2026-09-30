@@ -15,7 +15,7 @@ import {
 import type { BackendErrorCode, FetchImpl } from "./backend";
 import type { BackendTokenPair } from "./contracts";
 import type { SessionTokens } from "./cookies";
-import { invitationStateFor, uiMessageFor } from "./ui-messages";
+import { invitationStateFor, errorMessageFor } from "./ui-messages";
 import type { InvitationState } from "./contracts";
 
 export interface InvitationAcceptBody {
@@ -110,7 +110,7 @@ export async function acceptInvitationOutcome(
     return {
       httpStatus: 502,
       ...session,
-      body: { ok: false, state: "error", code, message: uiMessageFor(code) },
+      body: { ok: false, state: "error", code, message: errorMessageFor(code) },
     };
   }
   return {
@@ -120,7 +120,7 @@ export async function acceptInvitationOutcome(
       ok: false,
       state: invitationStateFor(code),
       code,
-      message: uiMessageFor(code),
+      message: errorMessageFor(code, call.result.retryAfterSeconds),
     },
   };
 }

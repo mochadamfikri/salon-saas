@@ -112,6 +112,11 @@ export interface AuthorizedCallOutcome<T> {
  * Run a backend call with an access token, performing at most ONE refresh
  * attempt when the access token is missing or rejected (401).
  *
+ * A 429 from the refresh endpoint is NOT a session failure: the result
+ * carries code `rate_limited` (with the backend's `retryAfterSeconds` when
+ * present) and the session is left untouched — cookies must not be cleared
+ * just because the client was asked to slow down.
+ *
  * When `options.allowRefresh` is false, no refresh is attempted at all: the
  * 401/unauthorized result is returned as-is. Callers that cannot persist a
  * rotated pair (Server Components) must pass false — see F-3.
@@ -145,6 +150,22 @@ export async function authorizedCallWithTokens<T>(
 
   const rotated = await backend.refresh({ refresh_token: tokens.refreshToken });
   if (!rotated.ok) {
+    if (rotated.code === "rate_limited") {
+      // The session is NOT invalid — the backend only asked us to slow
+      // down. Never clear cookies here; report 429 with the Retry-After
+      // hint so the UI can tell the user how long to wait.
+      return {
+        result: {
+          ok: false,
+          code: "rate_limited",
+          status: 429,
+          detail: "Session refresh rate limited",
+          ...(rotated.retryAfterSeconds !== undefined
+            ? { retryAfterSeconds: rotated.retryAfterSeconds }
+            : {}),
+        },
+      };
+    }
     const code: BackendErrorCode =
       rotated.code === "network_error" ? "network_error" : "invalid_refresh_token";
     return {
@@ -212,7 +233,8 @@ export function bffErrorResponse(
           ? 404
           : code === "invitation_expired" || code === "invitation_revoked"
             ? 410
-            : code === "invitation_already_accepted"
+            : code === "invitation_already_accepted" ||
+                code === "invitation_duplicate_membership"
               ? 409
               : code === "email_taken" || code === "slug_taken" || code === "validation_error"
                 ? 400

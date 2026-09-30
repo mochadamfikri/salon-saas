@@ -55,7 +55,8 @@ describe("POST /api/invitations/accept", () => {
       [404, "Invitation not found", 404, "invalid"],
       [410, "Invitation expired", 410, "expired"],
       [410, "Invitation revoked", 410, "revoked"],
-      [409, "Invitation already accepted", 409, "already_accepted"],
+      [409, "Invitation has already been accepted", 409, "already_accepted"],
+      [409, "User already has an active membership in this salon", 409, "already_member"],
       [422, "Invitation email mismatch", 422, "email_mismatch"],
     ];
     for (const [backendStatus, detail, expectedStatus, expectedState] of cases) {

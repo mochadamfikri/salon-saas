@@ -31,6 +31,7 @@ export type BackendErrorCode =
   | "invitation_expired"
   | "invitation_revoked"
   | "invitation_already_accepted"
+  | "invitation_duplicate_membership"
   | "invitation_email_mismatch"
   | "invitation_unavailable"
   | "validation_error"
@@ -43,7 +44,14 @@ export type BackendErrorCode =
 
 export type BackendResult<T> =
   | { ok: true; data: T; status: number }
-  | { ok: false; code: BackendErrorCode; status: number; detail: string };
+  | {
+      ok: false;
+      code: BackendErrorCode;
+      status: number;
+      detail: string;
+      /** Seconds from the backend's `Retry-After` header (429 only). */
+      retryAfterSeconds?: number;
+    };
 
 export type FetchImpl = typeof fetch;
 
@@ -76,7 +84,11 @@ export function mapBackendError(status: number, detail: string): BackendErrorCod
     return "not_found";
   }
   if (status === 409) {
-    if (d.includes("already accepted")) return "invitation_already_accepted";
+    // Backend wordings: "Invitation has already been accepted" and
+    // "User already has an active membership in this salon".
+    if (d.includes("already") && d.includes("accept")) return "invitation_already_accepted";
+    if (d.includes("already") && d.includes("membership"))
+      return "invitation_duplicate_membership";
     return "unknown_error";
   }
   if (status === 410) {
@@ -110,6 +122,18 @@ function safeDetail(value: unknown): string {
     if (typeof d === "string") return d.slice(0, 300);
   }
   return "Unexpected backend response";
+}
+
+/**
+ * Parse the backend's `Retry-After` response header (seconds) into a
+ * positive integer, or undefined when absent/invalid. The backend sends it
+ * on 429 responses with the rate-limit window length.
+ */
+function parseRetryAfter(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number.parseInt(value.trim(), 10);
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  return Math.min(seconds, 3600);
 }
 
 export class BackendClient {
@@ -157,7 +181,14 @@ export class BackendClient {
       }
 
       const detail = safeDetail(payload);
-      return { ok: false, code: mapBackendError(response.status, detail), status: response.status, detail };
+      const retryAfterSeconds = parseRetryAfter(response.headers.get("retry-after"));
+      return {
+        ok: false,
+        code: mapBackendError(response.status, detail),
+        status: response.status,
+        detail,
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      };
     } finally {
       clearTimeout(timer);
     }
@@ -193,12 +224,20 @@ export class BackendClient {
   }
 
   /**
-   * EXPECTED endpoint (backend Checkpoint D, P1-023 — not merged yet).
-   * Implemented against the approved contract. Until the backend ships it,
-   * FastAPI answers 404 with its default `{"detail": "Not Found"}` body;
-   * that exact shape is mapped to `invitation_unavailable` so the UI can
-   * explain invitations are not enabled yet instead of failing cryptically.
-   * A 404 whose detail mentions the invitation is a genuinely invalid token.
+   * POST /invitations/accept — canonical Phase 1 contract (backend
+   * Checkpoint D, live on `feature/phase-1-auth-tenancy`).
+   *
+   * Success (200): { membership, salon }. Failures: 401 unauthenticated,
+   * 404 invalid token, 409 already accepted / duplicate membership, 410
+   * expired or revoked, 422 email mismatch, 429 rate limited (with a
+   * `Retry-After` header in seconds).
+   *
+   * Defensive fallback: a 404 whose detail is exactly FastAPI's default
+   * `{"detail": "Not Found"}` means the route itself is missing (backend
+   * older than Checkpoint D); it maps to `invitation_unavailable` so the
+   * UI can explain invitations are not enabled instead of failing
+   * cryptically. A 404 whose detail mentions the invitation is a genuinely
+   * invalid token.
    */
   async acceptInvitation(
     accessToken: string,

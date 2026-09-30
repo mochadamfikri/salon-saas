@@ -57,7 +57,8 @@ describe("acceptInvitationOutcome", () => {
       [404, "Invitation not found", 404, "invalid"],
       [410, "Invitation expired", 410, "expired"],
       [410, "Invitation revoked", 410, "revoked"],
-      [409, "Invitation already accepted", 409, "already_accepted"],
+      [409, "Invitation has already been accepted", 409, "already_accepted"],
+      [409, "User already has an active membership in this salon", 409, "already_member"],
       [422, "Invitation email mismatch", 422, "email_mismatch"],
     ];
     for (const [backendStatus, detail, expectedStatus, expectedState] of cases) {
@@ -72,6 +73,49 @@ describe("acceptInvitationOutcome", () => {
       expect(outcome.body.state).toBe(expectedState);
       expect(outcome.body.message).toBeTruthy();
     }
+  });
+
+  it("reports a 429 with the Retry-After hint and keeps the session", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).endsWith("/invitations/accept")) {
+        return new Response(JSON.stringify({ detail: "Too many requests. Please wait a moment and try again." }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after": "45" },
+        });
+      }
+      return jsonResponse(200, { id: "u1" });
+    }) as unknown as typeof fetch;
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
+    expect(outcome.httpStatus).toBe(429);
+    expect(outcome.body).toMatchObject({ ok: false, code: "rate_limited" });
+    expect(outcome.body.message).toContain("45 seconds");
+    // The session was not invalidated: a rate limit is not a dead session.
+    expect(outcome.sessionInvalidated).toBe(false);
+  });
+
+  it("does not clear the session when the inline refresh is rate limited", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).endsWith("/invitations/accept")) {
+        return jsonResponse(401, { detail: "Token has expired" });
+      }
+      if (String(url).endsWith("/auth/refresh")) {
+        return new Response(JSON.stringify({ detail: "Too many requests." }), {
+          status: 429,
+          headers: { "content-type": "application/json", "retry-after": "60" },
+        });
+      }
+      return jsonResponse(404, {});
+    }) as unknown as typeof fetch;
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
+    expect(outcome.httpStatus).toBe(429);
+    expect(outcome.body.code).toBe("rate_limited");
+    expect(outcome.body.message).toContain("about 1 minute");
+    expect(outcome.sessionInvalidated).toBe(false);
+    expect(outcome.refreshedTokens).toBeUndefined();
   });
 
   it("reports invitation_unavailable when the backend route is missing", async () => {

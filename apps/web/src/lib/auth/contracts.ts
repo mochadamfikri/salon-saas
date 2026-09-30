@@ -5,10 +5,8 @@
  * `feature/phase-1-auth-tenancy`. The backend is the source of truth;
  * the frontend must never invent fields the backend does not return.
  *
- * Invitation contracts are marked EXPECTED: the backend implements them in
- * Checkpoint D (P1-021..P1-023), which is not merged yet. The frontend
- * implements against the approved contract from docs/PHASE_1_AUTH_TENANCY.md
- * and documents the expectation here.
+ * Invitation contracts follow the canonical Checkpoint D accept contract
+ * (live on the backend branch); see BackendInvitationAcceptResponse below.
  */
 
 /** POST /auth/register, POST /auth/login, POST /auth/refresh response. */
@@ -86,19 +84,26 @@ export interface BackendMySalon {
 }
 
 /**
- * EXPECTED backend contract (Checkpoint D, P1-023 — not implemented yet).
+ * Canonical backend contract (Checkpoint D — implemented and live on
+ * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).
  *
- * Approved endpoint: POST /invitations/accept
- * Approved request:  { "token": "<raw invitation token>" }
+ * Endpoint: POST /invitations/accept
+ * Request:  { "token": "<raw invitation token>" }
  *
- * Expected success (200): the created membership plus salon context.
- * Expected failures (mapped by backend `detail` string):
- *  - 404 "Invitation not found"        -> invalid token
- *  - 410 "Invitation expired"          -> expired
- *  - 410 "Invitation revoked"          -> revoked
- *  - 409 "Invitation already accepted" -> already accepted
- *  - 422 "Email mismatch"              -> invitation email != user email
- *  - 401                               -> not authenticated
+ * Success (200): the created membership plus salon context.
+ * Failures (mapped by backend status + `detail` string):
+ *  - 404 "Invalid invitation token"            -> invalid token
+ *  - 409 "Invitation has already been accepted"-> already accepted
+ *  - 409 "User already has an active membership in this salon"
+ *                                              -> duplicate membership
+ *  - 410 "Invitation has expired"              -> expired
+ *  - 410 "Invitation has been revoked"         -> revoked
+ *  - 422 "Invitation email mismatch: ..."      -> invitation email != user email
+ *  - 401                                       -> not authenticated
+ *  - 429 (with `Retry-After` header, seconds)  -> rate limited
+ *
+ * The backend never collapses invitation lifecycle failures into a
+ * generic 404; the frontend mirrors each outcome with its own UI state.
  */
 export interface BackendInvitationAcceptRequest {
   token: string;
@@ -120,5 +125,6 @@ export type InvitationState =
   | "expired"
   | "revoked"
   | "already_accepted"
+  | "already_member"
   | "email_mismatch"
   | "error";

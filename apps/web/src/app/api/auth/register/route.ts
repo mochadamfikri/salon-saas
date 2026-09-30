@@ -15,7 +15,7 @@ import {
   createBackendClient,
   setAuthCookies,
 } from "@/lib/auth/bff";
-import { uiMessageFor } from "@/lib/auth/ui-messages";
+import { errorMessageFor } from "@/lib/auth/ui-messages";
 import { validateEmail, validatePassword } from "@/lib/auth/validation";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -48,12 +48,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const backend = createBackendClient();
   const registered = await backend.register({ email, password });
   if (!registered.ok) {
-    return bffErrorResponse(registered.code, uiMessageFor(registered.code));
+    return bffErrorResponse(
+      registered.code,
+      errorMessageFor(registered.code, registered.retryAfterSeconds),
+    );
   }
 
   const me = await backend.getMe(registered.data.access_token);
   if (!me.ok) {
-    return bffErrorResponse("unknown_error", uiMessageFor("unknown_error"));
+    return bffErrorResponse("unknown_error", errorMessageFor("unknown_error"));
   }
 
   const res = NextResponse.json({ ok: true, user: me.data }, { status: 201 });

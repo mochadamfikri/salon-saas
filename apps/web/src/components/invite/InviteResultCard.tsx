@@ -57,6 +57,15 @@ export default function InviteResultCard({ result }: { result: InvitePageResult 
           </div>
         )}
 
+        {state === "already_member" && (
+          <div className="mt-4" data-testid="invite-already-member">
+            <Alert tone="info">
+              {result.message ?? "You are already a member of this salon."}
+            </Alert>
+            <DashboardLink />
+          </div>
+        )}
+
         {state === "login_required" && (
           <div className="mt-4" data-testid="invite-login-required">
             <Alert tone="info">

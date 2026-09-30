@@ -9,12 +9,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import {
-  bffErrorResponse,
-  createBackendClient,
-  setAuthCookies,
-} from "@/lib/auth/bff";
-import { uiMessageFor } from "@/lib/auth/ui-messages";
+import { bffErrorResponse, createBackendClient, setAuthCookies } from "@/lib/auth/bff";
+import { errorMessageFor } from "@/lib/auth/ui-messages";
 import { validateEmail } from "@/lib/auth/validation";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -46,14 +42,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const backend = createBackendClient();
   const login = await backend.login({ email, password });
   if (!login.ok) {
-    // Generic message: no user-enumeration oracle.
-    return bffErrorResponse(login.code, uiMessageFor(login.code));
+    // Generic message: no user-enumeration oracle. 429s carry the
+    // backend's Retry-After hint so the message can say how long to wait.
+    return bffErrorResponse(login.code, errorMessageFor(login.code, login.retryAfterSeconds));
   }
 
   // Load the safe user profile for the response (tokens stay server-side).
   const me = await backend.getMe(login.data.access_token);
   if (!me.ok) {
-    return bffErrorResponse("unknown_error", uiMessageFor("unknown_error"));
+    return bffErrorResponse("unknown_error", errorMessageFor("unknown_error"));
   }
 
   const res = NextResponse.json({ ok: true, user: me.data }, { status: 200 });

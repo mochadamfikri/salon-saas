@@ -1,11 +1,9 @@
 /**
  * BFF: POST /api/invitations/accept
  *
- * Forwards to the backend's invitation-accept contract
- * (POST /invitations/accept { token } — backend Checkpoint D, P1-023).
+ * Forwards to the backend's canonical invitation-accept contract
+ * (POST /invitations/accept { token } — backend Checkpoint D, live).
  *
- * Until the backend ships that endpoint this returns code
- * `invitation_unavailable` (503) so the UI can say so plainly.
  * The raw invitation token is used once from the request body and is never
  * persisted anywhere (no cookies, no storage).
  */
