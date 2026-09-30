@@ -14,7 +14,7 @@ class SalonServiceCreateRequest(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     category: str | None = Field(default=None, max_length=100)
     duration_minutes: int = Field(gt=0)
-    price_amount: Decimal = Field(ge=0, decimal_places=2)
+    price_amount: Decimal = Field(ge=0, decimal_places=2, max_digits=12)
     currency: str = Field(default="IDR", min_length=3, max_length=3)
 
 
@@ -25,7 +25,7 @@ class SalonServiceUpdateRequest(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     category: str | None = Field(default=None, max_length=100)
     duration_minutes: int | None = Field(default=None, gt=0)
-    price_amount: Decimal | None = Field(default=None, ge=0, decimal_places=2)
+    price_amount: Decimal | None = Field(default=None, ge=0, decimal_places=2, max_digits=12)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 

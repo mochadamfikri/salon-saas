@@ -89,7 +89,12 @@ def update_service_endpoint(
     """Update a service belonging to the current tenant."""
     _require_service_mutation_permission(tenant)
     service = _get_tenant_service_or_404(tenant, service_id)
-    updated = update_service(tenant.db, service, **payload.model_dump(exclude_unset=True))
+    try:
+        updated = update_service(tenant.db, service, **payload.model_dump(exclude_unset=True))
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        ) from None
     tenant.db.commit()
     return SalonServiceResponse.model_validate(updated)
 

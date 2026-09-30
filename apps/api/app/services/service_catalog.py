@@ -51,26 +51,27 @@ def get_service(db: Session, salon_id: UUID, service_id: UUID) -> SalonService |
 def update_service(
     db: Session,
     service: SalonService,
-    name: str | None = None,
-    description: str | None = None,
-    category: str | None = None,
-    duration_minutes: int | None = None,
-    price_amount: Decimal | None = None,
-    currency: str | None = None,
+    **fields,
 ) -> SalonService:
-    """Update an existing service."""
-    if name is not None:
-        service.name = name
-    if description is not None:
-        service.description = description
-    if category is not None:
-        service.category = category
-    if duration_minutes is not None:
-        service.duration_minutes = duration_minutes
-    if price_amount is not None:
-        service.price_amount = price_amount
-    if currency is not None:
-        service.currency = currency
+    """Update an existing service.
+
+    Nullable fields (description, category) can be explicitly cleared with None.
+    Non-nullable fields (name, duration_minutes, price_amount, currency) reject None.
+    Omitted fields are not changed.
+    """
+    nullable_fields = {"description", "category"}
+    required_fields = {"name", "duration_minutes", "price_amount", "currency"}
+
+    for field_name, value in fields.items():
+        if value is None and field_name in required_fields:
+            raise ValueError(f"Field '{field_name}' cannot be set to null")
+
+        # For nullable fields, None is valid and clears the field
+        # For required fields, None already rejected above
+        # For all fields, if present in kwargs, update regardless of value
+        if field_name in nullable_fields or field_name in required_fields:
+            setattr(service, field_name, value)
+
     db.flush()
     db.refresh(service)
     return service

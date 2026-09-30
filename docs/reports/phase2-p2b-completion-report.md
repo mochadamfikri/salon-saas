@@ -117,17 +117,19 @@ POST   /salons/{salon_id}/services/{service_id}/deactivate  Deactivate
 
 ### Full Suite Results
 ```
-141 passed, 16 warnings in 43.10s
+144 passed, 20 warnings in 45.44s
 ```
 
 **Breakdown:**
-- Phase 1 tests: 129 (unchanged, no regression)
-- P2-B tests: 12 (new)
-- Total: 141 PASS
+- Phase 1 + P2-A tests: 129 (unchanged, no regression)
+- P2-B tests: 12 (original)
+- P2-B audit remediation tests: 3 (NULL semantics + oversized Decimal)
+- Total: 144 PASS
 
 **Quality Gates:**
 - Ruff: All checks passed
-- Ruff format: 3 files reformatted, 50 unchanged
+- Ruff format: 52 files formatted
+- Black: Available (24.10.0)
 
 ---
 
@@ -220,27 +222,25 @@ ruff format --check .
 ## Git Status
 
 **Branch:** feature/phase-2-salon-operations  
-**Base Commit:** a9d603cc705d1471cb0b214e24bc50ec24f28998  
-**Files Staged:**
-- Modified: `apps/api/app/main.py`
-- New: `apps/api/app/routers/service.py`
-- New: `apps/api/app/schemas/service.py`
-- New: `apps/api/app/services/service_catalog.py`
-- New: `apps/api/tests/test_service_catalog.py`
-- Modified: `docs/agent/HERMES_HANDOFF.md`
+**Current HEAD:** 50369922eb6c7575dc7d7907565ad5cd7dc627e6  
+**Working Tree:** Modified (P2-B audit remediation in progress)
 
-**Commit Message (Recommended):**
+**Modified Files (Audit Remediation):**
+- `apps/api/app/schemas/service.py` — Added max_digits=12 to price validation
+- `apps/api/app/services/service_catalog.py` — Fixed NULL semantics (nullable vs required fields)
+- `apps/api/app/routers/service.py` — ValueError → HTTPException 422 for null rejection
+- `apps/api/tests/test_service_catalog.py` — Added 3 regression tests
+- `docs/agent/HERMES_HANDOFF.md` — Updated remote HEAD and availability wording
+
+**Pending Commit:**
 ```
-feat(phase2): P2-B service catalog API + RBAC + tests
+fix(phase2): P2-B audit remediation - NULL semantics + Decimal validation
 
-- Service Catalog REST API (6 endpoints: POST/GET/PATCH/activate/deactivate)
-- RBAC: Owner/Manager mutation, Staff read-only
-- Tenant isolation: cross-tenant 404, suspended denied
-- Contract validation: duration>0, price>=0, currency default IDR
-- 12 P2-B tests, 141 total PASS (no Phase 1 regression)
-- Ruff + format PASS
-
-Scope: Service Catalog API only (NOT Staff/Customer/Availability APIs)
+- PATCH NULL semantics: nullable fields (description, category) clear with explicit null
+- Non-nullable fields (name, duration, price, currency) reject null with 422
+- Added max_digits=12 to price validation (consistency with DB Numeric(12,2))
+- 3 new regression tests: clear nullable, reject null non-nullable, oversized Decimal
+- 144 total tests PASS (no regression)
 ```
 
 ---

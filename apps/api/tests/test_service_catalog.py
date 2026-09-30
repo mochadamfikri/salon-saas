@@ -343,3 +343,119 @@ def test_client_cannot_override_salon_id(
     payload = response.json()
     assert payload["salon_id"] == str(salon.id)
     assert payload["salon_id"] != str(fake_salon_id)
+
+
+def test_patch_can_clear_nullable_fields_with_explicit_null(salon_users: dict[str, object]) -> None:
+    """Nullable fields (description, category) can be cleared with explicit null."""
+    salon = salon_users["salon"]
+    assert isinstance(salon, Salon)
+
+    # Create service with description and category
+    created = client.post(
+        f"/salons/{salon.id}/services",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={
+            "name": "Service With Details",
+            "description": "Original description",
+            "category": "Original category",
+            "duration_minutes": 30,
+            "price_amount": "50000.00",
+        },
+    ).json()
+    assert created["description"] == "Original description"
+    assert created["category"] == "Original category"
+
+    # Clear description with explicit null
+    clear_desc = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"description": None},
+    )
+    assert clear_desc.status_code == 200
+    assert clear_desc.json()["description"] is None
+    assert clear_desc.json()["category"] == "Original category"  # unchanged
+
+    # Clear category with explicit null
+    clear_cat = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"category": None},
+    )
+    assert clear_cat.status_code == 200
+    assert clear_cat.json()["category"] is None
+
+
+def test_patch_rejects_null_for_non_nullable_fields(salon_users: dict[str, object]) -> None:
+    """Non-nullable fields (name, duration, price, currency) reject explicit null with 422."""
+    salon = salon_users["salon"]
+    assert isinstance(salon, Salon)
+
+    created = client.post(
+        f"/salons/{salon.id}/services",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"name": "Original Name", "duration_minutes": 30, "price_amount": "50000.00"},
+    ).json()
+
+    # name null -> 422
+    resp_name = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"name": None},
+    )
+    assert resp_name.status_code == 422
+
+    # duration_minutes null -> 422
+    resp_duration = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"duration_minutes": None},
+    )
+    assert resp_duration.status_code == 422
+
+    # price_amount null -> 422
+    resp_price = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"price_amount": None},
+    )
+    assert resp_price.status_code == 422
+
+    # currency null -> 422
+    resp_currency = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"currency": None},
+    )
+    assert resp_currency.status_code == 422
+
+
+def test_oversized_decimal_rejected(salon_users: dict[str, object]) -> None:
+    """Price exceeding Numeric(12,2) rejected with 422 before reaching DB."""
+    salon = salon_users["salon"]
+    assert isinstance(salon, Salon)
+
+    # Create: price > 12 digits total (10 integer + 2 decimal) -> 422
+    resp_create = client.post(
+        f"/salons/{salon.id}/services",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={
+            "name": "Oversized Price",
+            "duration_minutes": 30,
+            "price_amount": "12345678901.00",  # 13 digits total
+        },
+    )
+    assert resp_create.status_code == 422
+
+    # PATCH: same constraint
+    created = client.post(
+        f"/salons/{salon.id}/services",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"name": "Normal Service", "duration_minutes": 30, "price_amount": "50000.00"},
+    ).json()
+
+    resp_patch = client.patch(
+        f"/salons/{salon.id}/services/{created['id']}",
+        headers=_auth(str(salon_users["owner_token"])),
+        json={"price_amount": "99999999999.99"},  # 13 digits total
+    )
+    assert resp_patch.status_code == 422

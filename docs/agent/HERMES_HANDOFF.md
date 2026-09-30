@@ -72,7 +72,7 @@ POST   /salons/{salon_id}/services/{service_id}/deactivate
 4. **staff_weekly_availability** - jadwal mingguan
    - CHECK(day_of_week BETWEEN 0 AND 6)
    - CHECK(start_time < end_time)
-   - UNIQUE prevents exact duplicates only
+   - UNIQUE(staff_profile_id, day_of_week, start_time) is same-start collision guard; overlap protection in P2-D service layer
 
 5. **salon_customers** - customer per salon
    - email, phone OPTIONAL
@@ -96,8 +96,8 @@ After P2-B audit PASS:
 - jangan production
 
 ## Last Commits
-SHA: (pending) - feat(phase2): P2-B service catalog API + RBAC + tests
+SHA: 3fa834d - fix(phase2): P2-B audit remediation - NULL semantics + Decimal validation
+SHA: 5036992 - feat(phase2): P2-B service catalog API + RBAC + tests
 SHA: a9d603c - docs: P2-A audit remediation completion report
-SHA: 5e573e3 - style: format migration file
 
-**Remote HEAD:** a9d603cc705d1471cb0b214e24bc50ec24f28998
+**Remote HEAD (pending push):** 3fa834d0c466f041b95197f32a2b7456a140a2fa
