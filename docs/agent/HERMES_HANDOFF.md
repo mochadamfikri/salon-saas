@@ -96,8 +96,8 @@ After P2-B audit PASS:
 - jangan production
 
 ## Last Commits
-SHA: 3fa834d - fix(phase2): P2-B audit remediation - NULL semantics + Decimal validation
+SHA: 3b18ebe - fix(phase2): P2-B audit remediation - NULL semantics + Decimal validation
 SHA: 5036992 - feat(phase2): P2-B service catalog API + RBAC + tests
 SHA: a9d603c - docs: P2-A audit remediation completion report
 
-**Remote HEAD (pending push):** 3fa834d0c466f041b95197f32a2b7456a140a2fa
+**Remote HEAD:** 3b18ebe91557c4c5b1e1b35c1b35fa8ff36bc6af
