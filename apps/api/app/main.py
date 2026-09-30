@@ -6,6 +6,8 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.routers.auth import router as auth_router
+from app.routers.invitation import router as invitation_router
+from app.routers.password_reset import router as password_reset_router
 from app.routers.tenant import router as tenant_router
 
 settings = get_settings()
@@ -18,6 +20,8 @@ app = FastAPI(
     redoc_url=None,
 )
 app.include_router(auth_router)
+app.include_router(invitation_router)
+app.include_router(password_reset_router)
 app.include_router(tenant_router)
 
 
