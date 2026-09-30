@@ -12,8 +12,8 @@ Checkpoint E belum selesai.
 
 ### Completed Checkpoints
 - ✓ P2-A: Schema/Models/Migration (audited, remediated, PASS)
-- ✓ P2-B: Service Catalog API + RBAC + Tests
-- ✓ P2-C: Staff Profile + Staff-Service Assignment API + RBAC + Tests
+- ✓ P2-B: Service Catalog API + RBAC + Tests (audited, remediated, PASS)
+- ✓ P2-C: Staff Profile + Staff-Service Assignment API + RBAC + Tests (audited, remediated, READY FOR RE-AUDIT)
 
 ### P2-C Deliverables
 - ✓ Staff Profile CRUD (explicit provisioning, not auto-created)
@@ -23,7 +23,10 @@ Checkpoint E belum selesai.
 - ✓ Staff-Service Assignment API
 - ✓ Cross-salon invariant enforcement
 - ✓ Assignment mutation: owner/manager only
-- ✓ 32 P2-C tests + 176 total tests PASS
+- ✓ DELETE member with StaffProfile → 409 (FK conflict handling)
+- ✓ SUSPEND member with StaffProfile → 200 (lifecycle preserved)
+- ✓ Duplicate IntegrityError → 409 (DB constraint mapping)
+- ✓ 40 P2-C tests (32 original + 8 remediation) + 184 total tests PASS
 - ✓ Ruff + format PASS
 
 ### Endpoints (P2-C)
@@ -92,9 +95,11 @@ DELETE /salons/{salon_id}/staff-profiles/{staff_profile_id}/services/{service_id
    - No uniqueness constraints
 
 ## Next Action
-**STOP - AWAITING P2-C AUDIT**
+**STOP - AWAITING P2-C RE-AUDIT**
 
-After P2-C audit PASS:
+P2-C audit remediation completed (FK conflict handling + regression tests).
+
+After P2-C re-audit PASS:
 - P2-D: Weekly Availability API
 - P2-E: Customer Records API
 
@@ -108,8 +113,8 @@ After P2-C audit PASS:
 - jangan production
 
 ## Last Commits
+SHA: 0c869b3 - fix(phase2): P2-C audit remediation - FK conflict mapping + IntegrityError handling + regression tests
+SHA: 4390d94 - docs(phase2): add P2-C completion report
 SHA: a38e072 - feat(phase2): P2-C contract hardening - immutable field validation + manager update tests
-SHA: a7f5a3c - feat(phase2): P2-C staff profile + staff-service assignment API + RBAC + tests
-SHA: 96b2892 - docs: add P2-B audit remediation report
 
-**Remote HEAD:** a38e07230a9e8747fabe7812aab4f2f64b923964
+**Remote HEAD:** 0c869b3543f6846e87c3fe78528c0bcda70c300a
