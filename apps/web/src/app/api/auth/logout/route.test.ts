@@ -66,6 +66,65 @@ describe("POST /api/auth/logout", () => {
     expect(res.cookies.get(REFRESH_COOKIE)?.value).toBe("");
   });
 
+  it("refreshes exactly once and revokes when the access token is stale but refresh is alive (F-4)", async () => {
+    const seen: string[] = [];
+    const logoutAuths: Array<string | null> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        seen.push(String(url));
+        if (String(url).endsWith("/auth/logout")) {
+          const auth = new Headers(init.headers).get("authorization");
+          logoutAuths.push(auth);
+          // First attempt uses the stale access token -> backend says expired.
+          if (auth === "Bearer stale-access") {
+            return jsonResponse(401, { detail: "Token has expired" });
+          }
+          return jsonResponse(200, { message: "Logged out" });
+        }
+        if (String(url).endsWith("/auth/refresh")) {
+          return jsonResponse(200, {
+            access_token: "fresh-access",
+            refresh_token: "fresh-refresh",
+            token_type: "bearer",
+          });
+        }
+        return jsonResponse(404, {});
+      }),
+    );
+    const res = await POST(post(`${ACCESS_COOKIE}=stale-access; ${REFRESH_COOKIE}=refresh-1`));
+    expect(res.status).toBe(200);
+    // Exactly one refresh — no loop.
+    expect(seen.filter((u) => u.endsWith("/auth/refresh"))).toHaveLength(1);
+    // Logout attempted first with the stale token, then with the fresh one.
+    expect(logoutAuths).toEqual(["Bearer stale-access", "Bearer fresh-access"]);
+    expect(res.cookies.get(ACCESS_COOKIE)?.value).toBe("");
+    expect(res.cookies.get(REFRESH_COOKIE)?.value).toBe("");
+  });
+
+  it("does not refresh when the access token logout succeeds", async () => {
+    let refreshCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith("/auth/refresh")) {
+          refreshCalls += 1;
+          return jsonResponse(200, {
+            access_token: "fresh-access",
+            refresh_token: "fresh-refresh",
+            token_type: "bearer",
+          });
+        }
+        return jsonResponse(200, { message: "Logged out" });
+      }),
+    );
+    const res = await POST(post(`${ACCESS_COOKIE}=good-access; ${REFRESH_COOKIE}=refresh-1`));
+    expect(res.status).toBe(200);
+    expect(refreshCalls).toBe(0);
+    expect(res.cookies.get(ACCESS_COOKIE)?.value).toBe("");
+    expect(res.cookies.get(REFRESH_COOKIE)?.value).toBe("");
+  });
+
   it("skips backend revocation when refresh fails but still clears cookies", async () => {
     let logoutCalls = 0;
     vi.stubGlobal(

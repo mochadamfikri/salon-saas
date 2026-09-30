@@ -6,6 +6,7 @@ import {
   suggestSlug,
   unicodeLength,
   validateEmail,
+  validateOptionalSlug,
   validatePassword,
   validateSalonName,
   validateSlug,
@@ -82,6 +83,19 @@ describe("validateSlug", () => {
     expect(validateSlug("-leading").valid).toBe(false);
     expect(validateSlug("trailing-").valid).toBe(false);
     expect(validateSlug("double--hyphen").valid).toBe(false);
+  });
+});
+
+describe("validateOptionalSlug", () => {
+  it("accepts blank slugs (backend auto-generates)", () => {
+    expect(validateOptionalSlug("").valid).toBe(true);
+    expect(validateOptionalSlug("   ").valid).toBe(true);
+  });
+
+  it("validates an explicitly provided slug", () => {
+    expect(validateOptionalSlug("glow-studio").valid).toBe(true);
+    expect(validateOptionalSlug("BAD SLUG").valid).toBe(false);
+    expect(validateOptionalSlug("ab").valid).toBe(false);
   });
 });
 

@@ -54,6 +54,52 @@ describe("SalonCreateForm", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("submits with only the name after the suggested slug is cleared", async () => {
+    const user = userEvent.setup();
+    let sentBody: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        sentBody = JSON.parse(init.body as string);
+        return json(201, {
+          ok: true,
+          salon: { id: "s1", name: "Glow", slug: "glow-auto", status: "onboarding" },
+        });
+      }),
+    );
+    render(<SalonCreateForm />);
+    await user.type(screen.getByLabelText(/salon name/i), "Glow");
+    // Slug is pre-filled from the name suggestion; clearing it must still submit.
+    expect((screen.getByTestId("salon-slug-input") as HTMLInputElement).value).toBe("glow");
+    await user.clear(screen.getByTestId("salon-slug-input"));
+    await user.click(screen.getByTestId("salon-create-submit"));
+    expect(pushMock).toHaveBeenCalledWith("/salon/dashboard");
+    expect(sentBody).toEqual({ name: "Glow" });
+    expect(sentBody).not.toHaveProperty("slug");
+  });
+
+  it("submits an explicit valid slug", async () => {
+    const user = userEvent.setup();
+    let sentBody: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        sentBody = JSON.parse(init.body as string);
+        return json(201, {
+          ok: true,
+          salon: { id: "s1", name: "Glow", slug: "glow-custom", status: "onboarding" },
+        });
+      }),
+    );
+    render(<SalonCreateForm />);
+    await user.type(screen.getByLabelText(/salon name/i), "Glow");
+    await user.clear(screen.getByTestId("salon-slug-input"));
+    await user.type(screen.getByTestId("salon-slug-input"), "glow-custom");
+    await user.click(screen.getByTestId("salon-create-submit"));
+    expect(pushMock).toHaveBeenCalledWith("/salon/dashboard");
+    expect(sentBody).toEqual({ name: "Glow", slug: "glow-custom" });
+  });
+
   it("creates the salon and navigates to the salon dashboard", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(

@@ -50,6 +50,50 @@ describe("POST /api/salons", () => {
     expect(await res.json()).toMatchObject({ ok: true, salon });
   });
 
+  it("forwards { name } without a slug when the slug is omitted", async () => {
+    const salon = { id: "s1", name: "Glow", slug: "glow-auto", status: "onboarding" };
+    let forwarded: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        forwarded = JSON.parse(init.body as string);
+        return jsonResponse(201, salon);
+      }),
+    );
+    const res = await POST(authedPost({ name: "Glow" }, AUTH));
+    expect(res.status).toBe(201);
+    expect(forwarded).toEqual({ name: "Glow" });
+    expect(forwarded).not.toHaveProperty("slug");
+  });
+
+  it("forwards { name } without a slug when the slug is blank", async () => {
+    let forwarded: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        forwarded = JSON.parse(init.body as string);
+        return jsonResponse(201, { id: "s1", name: "Glow", slug: "glow-auto", status: "onboarding" });
+      }),
+    );
+    const res = await POST(authedPost({ name: "Glow", slug: "   " }, AUTH));
+    expect(res.status).toBe(201);
+    expect(forwarded).toEqual({ name: "Glow" });
+  });
+
+  it("forwards an explicit valid slug", async () => {
+    let forwarded: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        forwarded = JSON.parse(init.body as string);
+        return jsonResponse(201, { id: "s1", name: "Glow", slug: "glow", status: "onboarding" });
+      }),
+    );
+    const res = await POST(authedPost({ name: "Glow", slug: "glow" }, AUTH));
+    expect(res.status).toBe(201);
+    expect(forwarded).toEqual({ name: "Glow", slug: "glow" });
+  });
+
   it("rejects invalid slugs client-side without hitting the backend", async () => {
     const fetchMock = vi.fn(async () => jsonResponse(201, {}));
     vi.stubGlobal("fetch", fetchMock);

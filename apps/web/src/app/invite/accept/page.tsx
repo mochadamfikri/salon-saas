@@ -30,22 +30,25 @@ export const dynamic = "force-dynamic";
 export default async function InviteAcceptPage() {
   const store = await cookies();
   const nonce = decodeCookieValue(store.get(INVITE_CONTINUATION_COOKIE)?.value);
-  const rawToken = nonce ? consumeInviteContinuation(nonce) : null;
+  const rawToken = nonce ? await consumeInviteContinuation(nonce) : null;
 
   if (!rawToken) {
     return <InviteResultCard result={{ state: "missing_token" }} />;
   }
 
   // The token is used once here, server-side, and never persisted.
+  // allowRefresh: false — a Server Component cannot persist a rotated token
+  // pair, so it must never trigger a refresh rotation (F-3). The proxy has
+  // already resolved (and, if needed, rotated + persisted) the session
+  // before this page renders, forwarding fresh cookies with the request.
   const outcome = await acceptInvitationOutcome(
     {
       accessToken: decodeCookieValue(store.get(ACCESS_COOKIE)?.value),
       refreshToken: decodeCookieValue(store.get(REFRESH_COOKIE)?.value),
     },
     rawToken,
+    { allowRefresh: false },
   );
-  // Note: a refreshed token pair cannot be persisted from a Server
-  // Component; the proxy rotates transparently on the next navigation.
 
   return (
     <InviteResultCard

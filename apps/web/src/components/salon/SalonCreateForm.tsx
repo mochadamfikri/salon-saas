@@ -2,16 +2,19 @@
 
 /**
  * Salon creation form (authenticated only — the page guards this).
- * Sends { name, slug } to the BFF; the backend decides slug validity,
- * reserved slugs, uniqueness, and OWNER provisioning. The UI never assumes
- * ownership from local state — only the backend response grants it.
+ *
+ * The slug is OPTIONAL: when left blank, only { name } is sent and the
+ * backend auto-generates the slug. An explicit slug is validated for UX,
+ * but the backend decides slug validity, reserved slugs, uniqueness, and
+ * OWNER provisioning. The UI never assumes ownership from local state —
+ * only the backend response grants it.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Alert, Button, Card, Field, FormStatus, PageShell, TextInput } from "@/components/ui";
-import { suggestSlug, validateSalonName, validateSlug } from "@/lib/auth/validation";
+import { suggestSlug, validateOptionalSlug, validateSalonName } from "@/lib/auth/validation";
 
 interface CreateSalonResponse {
   ok: boolean;
@@ -42,7 +45,9 @@ export default function SalonCreateForm() {
     const errors: { name?: string; slug?: string } = {};
     const nameCheck = validateSalonName(name);
     if (!nameCheck.valid) errors.name = nameCheck.error;
-    const slugCheck = validateSlug(slug);
+    // Blank slug is allowed (backend auto-generates); an explicit slug is validated.
+    const trimmedSlug = slug.trim().toLowerCase();
+    const slugCheck = validateOptionalSlug(trimmedSlug);
     if (!slugCheck.valid) errors.slug = slugCheck.error;
     setFieldErrors(errors);
     if (errors.name ?? errors.slug) return;
@@ -52,7 +57,9 @@ export default function SalonCreateForm() {
       const res = await fetch("/api/salons", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), slug: slug.trim().toLowerCase() }),
+        body: JSON.stringify(
+          trimmedSlug ? { name: name.trim(), slug: trimmedSlug } : { name: name.trim() },
+        ),
       });
       const payload = (await res.json()) as CreateSalonResponse;
       if (!res.ok || !payload.ok) {
@@ -96,16 +103,15 @@ export default function SalonCreateForm() {
           </Field>
           <Field
             id="slug"
-            label="Salon URL slug"
+            label="Salon URL slug (optional)"
             error={fieldErrors.slug}
-            hint="Lowercase letters, numbers, and hyphens only. Used in your salon's web address."
+            hint="Lowercase letters, numbers, and hyphens only. Leave blank and we'll generate one for you."
           >
             <TextInput
               id="slug"
               name="slug"
               type="text"
               autoComplete="off"
-              required
               value={slug}
               onChange={(e) => {
                 setSlugTouched(true);

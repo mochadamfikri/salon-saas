@@ -51,10 +51,16 @@ export interface BackendSalon {
   status: "onboarding" | "active" | "suspended";
 }
 
-/** POST /salons request. Slug is required by the backend contract. */
+/**
+ * POST /salons request.
+ *
+ * Slug is OPTIONAL: when omitted (or blank), the backend auto-generates one
+ * and remains the authority for slug validity, reserved slugs, and
+ * uniqueness. A provided slug is validated for UX, but the backend decides.
+ */
 export interface BackendSalonCreateRequest {
   name: string;
-  slug: string;
+  slug?: string;
 }
 
 /** Tenant role. `customer` is intentionally NOT a tenant role. */

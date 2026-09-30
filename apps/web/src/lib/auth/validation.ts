@@ -81,6 +81,16 @@ export function validateSlug(slug: string): ValidationResult {
   return { valid: true };
 }
 
+/**
+ * Slug is optional: a blank slug means "let the backend generate one".
+ * A provided (explicit) slug is still validated for UX; the backend remains
+ * the authority for validity, reserved slugs, and uniqueness.
+ */
+export function validateOptionalSlug(slug: string): ValidationResult {
+  if (!slug.trim()) return { valid: true };
+  return validateSlug(slug);
+}
+
 /** Suggest a backend-compatible slug from a salon name (UX helper only). */
 export function suggestSlug(name: string): string {
   return name
