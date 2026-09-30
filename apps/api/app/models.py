@@ -226,7 +226,7 @@ class SalonService(TimestampMixin, Base):
 
 class StaffProfile(TimestampMixin, Base):
     """Extended staff profile (one-to-one with SalonMembership).
-    
+
     SalonMembership is the authoritative source for user_id and salon_id.
     This profile extends membership with operational booking metadata.
     """
@@ -288,7 +288,7 @@ class StaffServiceAssignment(TimestampMixin, Base):
 
 class StaffWeeklyAvailability(TimestampMixin, Base):
     """Weekly recurring availability schedule for staff.
-    
+
     Note: UNIQUE(staff_profile_id, day_of_week, start_time) prevents exact duplicates only.
     It does NOT prevent overlapping time slots. Overlap validation is an application-layer
     concern to be implemented in P2-D service logic with concurrency-safe tests.
@@ -326,7 +326,7 @@ class StaffWeeklyAvailability(TimestampMixin, Base):
 
 class SalonCustomer(TimestampMixin, Base):
     """Tenant-scoped customer record.
-    
+
     Customers are scoped per salon. Email and phone are optional - a customer
     can be registered with just a name (walk-in scenario). Email/phone normalization
     and duplicate detection are service-layer concerns.
