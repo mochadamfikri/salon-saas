@@ -83,6 +83,38 @@ export interface BackendMySalon {
   salon: BackendSalon;
 }
 
+export interface BackendSalonService {
+  id: string;
+  salon_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  duration_minutes: number;
+  price_amount: string;
+  currency: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BackendSalonServiceCreateRequest {
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  duration_minutes: number;
+  price_amount: string;
+  currency?: string;
+}
+
+export interface BackendSalonServiceUpdateRequest {
+  name?: string;
+  description?: string | null;
+  category?: string | null;
+  duration_minutes?: number;
+  price_amount?: string;
+  currency?: string;
+}
+
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
  * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).

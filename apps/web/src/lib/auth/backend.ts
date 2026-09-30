@@ -15,6 +15,9 @@ import type {
   BackendRegisterRequest,
   BackendSalon,
   BackendSalonCreateRequest,
+  BackendSalonService,
+  BackendSalonServiceCreateRequest,
+  BackendSalonServiceUpdateRequest,
   BackendTokenPair,
   BackendUser,
 } from "./contracts";
@@ -221,6 +224,44 @@ export class BackendClient {
 
   getMySalons(accessToken: string): Promise<BackendResult<BackendMySalon[]>> {
     return this.request<BackendMySalon[]>("/me/salons", { method: "GET", accessToken });
+  }
+
+  listServices(accessToken: string, salonId: string): Promise<BackendResult<BackendSalonService[]>> {
+    return this.request<BackendSalonService[]>(`/salons/${encodeURIComponent(salonId)}/services`, {
+      method: "GET",
+      accessToken,
+    });
+  }
+
+  getService(accessToken: string, salonId: string, serviceId: string): Promise<BackendResult<BackendSalonService>> {
+    return this.request<BackendSalonService>(`/salons/${encodeURIComponent(salonId)}/services/${encodeURIComponent(serviceId)}`, {
+      method: "GET",
+      accessToken,
+    });
+  }
+
+  createService(accessToken: string, salonId: string, body: BackendSalonServiceCreateRequest): Promise<BackendResult<BackendSalonService>> {
+    return this.request<BackendSalonService>(`/salons/${encodeURIComponent(salonId)}/services`, {
+      method: "POST",
+      body,
+      accessToken,
+    });
+  }
+
+  updateService(accessToken: string, salonId: string, serviceId: string, body: BackendSalonServiceUpdateRequest): Promise<BackendResult<BackendSalonService>> {
+    return this.request<BackendSalonService>(`/salons/${encodeURIComponent(salonId)}/services/${encodeURIComponent(serviceId)}`, {
+      method: "PATCH",
+      body,
+      accessToken,
+    });
+  }
+
+  setServiceActive(accessToken: string, salonId: string, serviceId: string, active: boolean): Promise<BackendResult<BackendSalonService>> {
+    const action = active ? "activate" : "deactivate";
+    return this.request<BackendSalonService>(`/salons/${encodeURIComponent(salonId)}/services/${encodeURIComponent(serviceId)}/${action}`, {
+      method: "POST",
+      accessToken,
+    });
   }
 
   /**
