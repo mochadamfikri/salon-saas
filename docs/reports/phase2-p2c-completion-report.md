@@ -106,7 +106,7 @@ Staff cannot self-assign/unassign (operational/business control, not personal pr
    - StaffServiceAssignmentResponse
 
 3. **app/routers/staff_profile.py** (10,758 bytes)
-   - 9 endpoints with TenantContext + RBAC guards
+   - 8 public endpoints with TenantContext + RBAC guards
    - Self-profile determination via `membership.user_id == current_user.id`
    - Owner/Manager permission helpers
 

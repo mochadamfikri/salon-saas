@@ -126,8 +126,22 @@ def remove_member_endpoint(
         tenant.db.commit()
         return {"message": "Member removed successfully"}
     except ValueError as e:
-        tenant.db.rollback()
+        # The service rejects this before mutating the session; no rollback needed.
+        error_msg = str(e)
+        # P2-C: member with operational profile → 409 (not 403)
+        if "operational staff profile" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=error_msg,
+            ) from None
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e),
+            detail=error_msg,
+        ) from None
+    except IntegrityError:
+        # Final safety net for any FK constraint (e.g., future relations)
+        tenant.db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot remove member with existing operational data. Use suspend instead.",
         ) from None

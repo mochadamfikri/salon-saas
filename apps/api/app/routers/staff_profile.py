@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 from app.core.tenant import TenantContext, get_tenant_context
 from app.models import StaffProfile, StaffServiceAssignment
@@ -27,6 +28,12 @@ from app.services.staff_profile import (
 )
 
 router = APIRouter(tags=["staff-profiles"])
+
+
+def _is_expected_duplicate_error(error: IntegrityError, constraint_name: str) -> bool:
+    """Return whether an IntegrityError is the expected named UNIQUE constraint."""
+    diagnostics = getattr(getattr(error, "orig", None), "diag", None)
+    return getattr(diagnostics, "constraint_name", None) == constraint_name
 
 
 def _require_profile_creation_permission(tenant: TenantContext) -> None:
@@ -135,18 +142,35 @@ def create_staff_profile_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=error_msg,
             ) from None
-        elif "already has" in error_msg.lower():
+        if "already has" in error_msg.lower():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=error_msg,
             ) from None
-        else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_msg,
+        ) from None
+    except IntegrityError as e:
+        tenant.db.rollback()
+        if _is_expected_duplicate_error(e, "staff_profiles_membership_id_key"):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=error_msg,
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Membership already has a staff profile",
             ) from None
+        raise
 
-    tenant.db.commit()
+    try:
+        tenant.db.commit()
+    except IntegrityError as e:
+        tenant.db.rollback()
+        if _is_expected_duplicate_error(e, "staff_profiles_membership_id_key"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Membership already has a staff profile",
+            ) from None
+        raise
+
     return StaffProfileResponse.model_validate(profile)
 
 
@@ -268,18 +292,35 @@ def create_assignment_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=error_msg,
             ) from None
-        elif "already exists" in error_msg.lower():
+        if "already exists" in error_msg.lower():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=error_msg,
             ) from None
-        else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_msg,
+        ) from None
+    except IntegrityError as e:
+        tenant.db.rollback()
+        if _is_expected_duplicate_error(e, "uq_staff_service_assignments_staff_service"):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=error_msg,
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Assignment already exists",
             ) from None
+        raise
 
-    tenant.db.commit()
+    try:
+        tenant.db.commit()
+    except IntegrityError as e:
+        tenant.db.rollback()
+        if _is_expected_duplicate_error(e, "uq_staff_service_assignments_staff_service"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Assignment already exists",
+            ) from None
+        raise
+
     return StaffServiceAssignmentResponse.model_validate(assignment)
 
 

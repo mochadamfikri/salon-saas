@@ -96,11 +96,24 @@ def update_member_status(db: Session, membership_id: uuid.UUID, new_status: str)
 
 
 def remove_member(db: Session, membership_id: uuid.UUID) -> None:
-    """Remove a non-owner member after endpoint RBAC authorization."""
+    """Remove a non-owner member after endpoint RBAC authorization.
+
+    Raises:
+        ValueError: If membership not found, is owner, or has operational profile/data
+    """
     membership = db.get(SalonMembership, membership_id)
     if not membership:
         raise ValueError("Membership not found")
     if membership.role == "owner":
         raise ValueError("Cannot remove owner")
+
+    # P2-C guard: prevent hard-delete when operational staff profile exists
+    # Owner contract: StaffProfile is not hard-deleted; use suspend instead
+    if hasattr(membership, "staff_profile") and membership.staff_profile is not None:
+        raise ValueError(
+            "Member has operational staff profile and cannot be hard-deleted. "
+            "Use suspend instead to revoke access while preserving operational history."
+        )
+
     db.delete(membership)
     db.flush()
