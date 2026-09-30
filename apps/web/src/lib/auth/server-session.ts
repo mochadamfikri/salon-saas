@@ -14,12 +14,12 @@ import { redirect } from "next/navigation";
 
 import { BackendClient } from "./backend";
 import { createBackendClient } from "./bff";
-import { ACCESS_COOKIE } from "./cookies";
+import { ACCESS_COOKIE, decodeCookieValue } from "./cookies";
 import type { BackendMySalon, BackendUser } from "./contracts";
 
 async function accessTokenFromCookies(): Promise<string | undefined> {
   const store = await cookies();
-  return store.get(ACCESS_COOKIE)?.value || undefined;
+  return decodeCookieValue(store.get(ACCESS_COOKIE)?.value);
 }
 
 function client(): BackendClient {

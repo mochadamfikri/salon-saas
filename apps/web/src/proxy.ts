@@ -2,107 +2,152 @@
  * Next.js 16 `proxy` (replaces the deprecated `middleware` convention).
  *
  * Server-authoritative route protection:
- *  - Protected pages (/customer/*, /salon/*) require a session cookie.
- *    Cookie presence alone only decides the redirect; the backend remains
- *    authoritative — pages/BFF re-validate every request.
- *  - Authenticated users visiting /login or /register are sent to the
- *    customer dashboard (preserving a safe `?next=` continuation).
- *  - When the short-lived access cookie is gone but the refresh cookie
- *    survives, the proxy performs ONE backend refresh and re-issues cookies
- *    before the page renders. A failed refresh clears cookies and redirects
- *    to /login. No infinite loops: a single attempt per request.
+ *  - Protected pages (/customer/*, /salon/*) require a *valid* backend
+ *    session. Cookie presence alone is never trusted: the access token is
+ *    verified against the backend on each navigation, with exactly ONE
+ *    refresh attempt when it is missing/expired. A failed refresh clears
+ *    the cookies and redirects to /login — no infinite loops, because auth
+ *    pages render the form (instead of bouncing) when the session is stale.
+ *  - Auth pages (/login, /register) bounce already-authenticated users to
+ *    the dashboard (preserving a safe `?next=` continuation); stale
+ *    sessions see the form with dead cookies cleared.
+ *  - Invitation links (/invite/accept?token=…): the raw token is parked
+ *    server-side under a random nonce (HttpOnly `salon_ic` cookie) and
+ *    stripped from the URL immediately. The token never enters auth URLs,
+ *    cookies, storage, or client props — the page consumes the nonce and
+ *    accepts the invitation server-side.
  */
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { BackendClient } from "@/lib/auth/backend";
+import { clearAuthCookies, createBackendClient, setAuthCookies } from "@/lib/auth/bff";
+import type { BackendTokenPair } from "@/lib/auth/contracts";
 import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-  accessCookieAttributes,
-  expiredCookieAttributes,
-  refreshCookieAttributes,
+  INVITE_CONTINUATION_COOKIE,
+  inviteContinuationCookieAttributes,
+  parseSessionTokens,
+  hasAnySessionToken,
+  withSessionTokens,
 } from "@/lib/auth/cookies";
+import { createInviteContinuation } from "@/lib/auth/invite-continuation";
 import { safeRedirectPath } from "@/lib/auth/validation";
 
 export const config = {
-  matcher: ["/customer/:path*", "/salon/:path*", "/login", "/register"],
+  matcher: ["/customer/:path*", "/salon/:path*", "/login", "/register", "/invite/accept"],
 };
 
 const AUTH_PAGES = new Set(["/login", "/register"]);
 
-function loginRedirect(req: NextRequest): NextResponse {
-  const nextParam = req.nextUrl.pathname + req.nextUrl.search;
+type SessionResolution =
+  | { kind: "none" }
+  | { kind: "valid" }
+  | { kind: "refreshed"; tokens: BackendTokenPair }
+  | { kind: "invalid" };
+
+/**
+ * Resolve the request's session against the backend. Verifies the access
+ * token and performs at most ONE refresh rotation — never a retry loop.
+ * Fail-closed: any backend/network problem resolves to "invalid".
+ */
+async function resolveSession(req: NextRequest): Promise<SessionResolution> {
+  const tokens = parseSessionTokens(req.headers.get("cookie"));
+  if (!hasAnySessionToken(tokens)) return { kind: "none" };
+
+  const backend = createBackendClient();
+  if (tokens.accessToken) {
+    const me = await backend.getMe(tokens.accessToken);
+    if (me.ok) return { kind: "valid" };
+  }
+  if (tokens.refreshToken) {
+    const rotated = await backend.refresh({ refresh_token: tokens.refreshToken });
+    if (rotated.ok) return { kind: "refreshed", tokens: rotated.data };
+  }
+  return { kind: "invalid" };
+}
+
+function loginRedirect(req: NextRequest, nextPath?: string): NextResponse {
   const url = req.nextUrl.clone();
   url.pathname = "/login";
-  url.search = `?next=${encodeURIComponent(nextParam)}`;
+  url.search = `?next=${encodeURIComponent(nextPath ?? req.nextUrl.pathname + req.nextUrl.search)}`;
   return NextResponse.redirect(url);
 }
 
-function applySessionCookies(
-  res: NextResponse,
-  accessToken: string,
-  refreshToken: string,
-): void {
-  const nodeEnv = process.env.NODE_ENV;
-  res.cookies.set(ACCESS_COOKIE, accessToken, {
-    ...accessCookieAttributes(nodeEnv),
-  });
-  res.cookies.set(REFRESH_COOKIE, refreshToken, {
-    ...refreshCookieAttributes(nodeEnv),
-  });
-}
+/**
+ * Invitation entry point. Parks `?token=` server-side and strips it from
+ * the URL; unauthenticated visitors continue through /login with the
+ * invitation held server-side (never in the auth URL).
+ */
+async function handleInvite(req: NextRequest, nodeEnv: string | undefined): Promise<NextResponse> {
+  const rawToken = req.nextUrl.searchParams.get("token");
+  const session = await resolveSession(req);
 
-function clearSessionCookies(res: NextResponse): void {
-  const expired = expiredCookieAttributes();
-  res.cookies.set(ACCESS_COOKIE, "", { ...expired });
-  res.cookies.set(REFRESH_COOKIE, "", { ...expired });
+  const parkToken = (res: NextResponse): NextResponse => {
+    if (rawToken) {
+      const nonce = createInviteContinuation(rawToken);
+      res.cookies.set(INVITE_CONTINUATION_COOKIE, nonce, {
+        ...inviteContinuationCookieAttributes(nodeEnv),
+      });
+    }
+    return res;
+  };
+
+  if (session.kind === "valid" || session.kind === "refreshed") {
+    if (!rawToken) return NextResponse.next();
+    // Authenticated: strip the token from the URL at once; the page
+    // consumes the parked nonce server-side.
+    const res = NextResponse.redirect(new URL("/invite/accept", req.url));
+    if (session.kind === "refreshed") setAuthCookies(res, session.tokens, nodeEnv);
+    return parkToken(res);
+  }
+
+  // No usable session: park the token, then continue through login.
+  const res = loginRedirect(req, "/invite/accept");
+  clearAuthCookies(res, nodeEnv);
+  return parkToken(res);
 }
 
 export async function proxy(req: NextRequest): Promise<NextResponse> {
+  const nodeEnv = process.env.NODE_ENV;
   const { pathname } = req.nextUrl;
-  const accessToken = req.cookies.get(ACCESS_COOKIE)?.value;
-  const refreshToken = req.cookies.get(REFRESH_COOKIE)?.value;
-  const hasSession = Boolean(accessToken ?? refreshToken);
 
-  // Auth pages: bounce already-authenticated users away.
+  if (pathname === "/invite/accept") {
+    if (req.method !== "GET") return NextResponse.next();
+    return handleInvite(req, nodeEnv);
+  }
+
+  const session = await resolveSession(req);
+
+  // Auth pages: bounce authenticated users away, show the form otherwise.
   if (AUTH_PAGES.has(pathname)) {
-    if (hasSession) {
+    if (session.kind === "valid" || session.kind === "refreshed") {
       const dest = safeRedirectPath(req.nextUrl.searchParams.get("next"), "/customer/dashboard");
-      return NextResponse.redirect(new URL(dest, req.url));
-    }
-    return NextResponse.next();
-  }
-
-  // Protected pages: no session at all -> login.
-  if (!accessToken && !refreshToken) {
-    return loginRedirect(req);
-  }
-
-  // Access cookie present: let the page/BFF validate it against the backend.
-  if (accessToken) {
-    return NextResponse.next();
-  }
-
-  // Access gone but refresh survives: single transparent rotation attempt.
-  try {
-    const backend = new BackendClient({
-      baseUrl: process.env.API_BASE_URL ?? "http://localhost:8000",
-      timeoutMs: 8_000,
-    });
-    const rotated = await backend.refresh({ refresh_token: refreshToken as string });
-    if (!rotated.ok) {
-      const res = loginRedirect(req);
-      clearSessionCookies(res);
+      const res = NextResponse.redirect(new URL(dest, req.url));
+      if (session.kind === "refreshed") setAuthCookies(res, session.tokens, nodeEnv);
       return res;
     }
     const res = NextResponse.next();
-    applySessionCookies(res, rotated.data.access_token, rotated.data.refresh_token);
-    return res;
-  } catch {
-    const res = loginRedirect(req);
-    clearSessionCookies(res);
+    if (session.kind === "invalid") clearAuthCookies(res, nodeEnv);
     return res;
   }
+
+  // Protected pages.
+  if (session.kind === "valid") return NextResponse.next();
+  if (session.kind === "refreshed") {
+    // Forward with fresh tokens so the page renders without another redirect.
+    const headers = new Headers(req.headers);
+    headers.set(
+      "cookie",
+      withSessionTokens(req.headers.get("cookie"), {
+        accessToken: session.tokens.access_token,
+        refreshToken: session.tokens.refresh_token,
+      }),
+    );
+    const res = NextResponse.next({ request: { headers } });
+    setAuthCookies(res, session.tokens, nodeEnv);
+    return res;
+  }
+  const res = loginRedirect(req);
+  clearAuthCookies(res, nodeEnv);
+  return res;
 }

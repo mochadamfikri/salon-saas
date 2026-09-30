@@ -15,11 +15,10 @@ import type { NextRequest } from "next/server";
 
 import {
   applySessionOutcome,
-  authorizedCall,
   bffErrorResponse,
-  createBackendClient,
+  getRequestTokens,
 } from "@/lib/auth/bff";
-import { invitationStateFor, uiMessageFor } from "@/lib/auth/ui-messages";
+import { acceptInvitationOutcome } from "@/lib/auth/invitations";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -38,30 +37,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const backend = createBackendClient();
-  const outcome = await authorizedCall({ backend, req }, (accessToken) =>
-    backend.acceptInvitation(accessToken, { token }),
-  );
+  const outcome = await acceptInvitationOutcome(getRequestTokens(req), token);
 
-  if (!outcome.result.ok) {
-    const code = outcome.result.code;
-    const state = invitationStateFor(code);
-    const message = uiMessageFor(code);
-    const statusOverride = code === "invitation_unavailable" ? 503 : undefined;
-    const err = bffErrorResponse(code, message, { state }, statusOverride);
-    applySessionOutcome(err, outcome);
-    return err;
-  }
-
-  const res = NextResponse.json(
-    {
-      ok: true,
-      state: "success" as const,
-      membership: outcome.result.data.membership,
-      salon: outcome.result.data.salon,
-    },
-    { status: 200 },
-  );
+  const res = NextResponse.json(outcome.body, { status: outcome.httpStatus });
   applySessionOutcome(res, outcome);
   return res;
 }

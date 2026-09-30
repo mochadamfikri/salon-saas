@@ -22,6 +22,7 @@ import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
   accessCookieAttributes,
+  decodeCookieValue,
   expiredCookieAttributes,
   refreshCookieAttributes,
   type CookieAttributes,
@@ -40,8 +41,8 @@ export function createBackendClient(fetchImpl?: typeof fetch): BackendClient {
 /** Read raw session tokens from the incoming request's cookies. */
 export function getRequestTokens(req: NextRequest): SessionTokens {
   return {
-    accessToken: req.cookies.get(ACCESS_COOKIE)?.value || undefined,
-    refreshToken: req.cookies.get(REFRESH_COOKIE)?.value || undefined,
+    accessToken: decodeCookieValue(req.cookies.get(ACCESS_COOKIE)?.value),
+    refreshToken: decodeCookieValue(req.cookies.get(REFRESH_COOKIE)?.value),
   };
 }
 
@@ -51,7 +52,8 @@ function applyCookie(
   value: string,
   attrs: CookieAttributes,
 ): void {
-  res.cookies.set(name, value, {
+  // Encode so opaque backend tokens always round-trip through cookie parsing.
+  res.cookies.set(name, encodeURIComponent(value), {
     httpOnly: attrs.httpOnly,
     secure: attrs.secure,
     sameSite: attrs.sameSite,
@@ -71,8 +73,11 @@ export function setAuthCookies(
 }
 
 /** Expire both session cookies on the response (logout / invalidation). */
-export function clearAuthCookies(res: NextResponse): void {
-  const expired = expiredCookieAttributes();
+export function clearAuthCookies(
+  res: NextResponse,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): void {
+  const expired = expiredCookieAttributes(nodeEnv);
   applyCookie(res, ACCESS_COOKIE, "", expired);
   applyCookie(res, REFRESH_COOKIE, "", expired);
 }
@@ -80,6 +85,11 @@ export function clearAuthCookies(res: NextResponse): void {
 export interface AuthorizedCallOptions {
   backend: BackendClient;
   req: NextRequest;
+}
+
+export interface AuthorizedCallTokensOptions {
+  backend: BackendClient;
+  tokens: SessionTokens;
 }
 
 export interface AuthorizedCallOutcome<T> {
@@ -91,18 +101,17 @@ export interface AuthorizedCallOutcome<T> {
 }
 
 /**
- * Run a backend call with the request's access token, performing at most ONE
- * refresh attempt when the access token is missing or rejected (401).
+ * Run a backend call with an access token, performing at most ONE refresh
+ * attempt when the access token is missing or rejected (401).
  *
  * Never throws for auth problems. The caller applies `refreshedTokens` /
  * `sessionInvalidated` to its own response via setAuthCookies/clearAuthCookies.
  */
-export async function authorizedCall<T>(
-  options: AuthorizedCallOptions,
+export async function authorizedCallWithTokens<T>(
+  options: AuthorizedCallTokensOptions,
   call: (accessToken: string) => Promise<BackendResult<T>>,
 ): Promise<AuthorizedCallOutcome<T>> {
-  const { backend, req } = options;
-  const tokens = getRequestTokens(req);
+  const { backend, tokens } = options;
 
   if (tokens.accessToken) {
     const first = await call(tokens.accessToken);
@@ -133,6 +142,20 @@ export async function authorizedCall<T>(
 }
 
 /**
+ * Same as {@link authorizedCallWithTokens} but reads the session tokens from
+ * a Route Handler's incoming request.
+ */
+export async function authorizedCall<T>(
+  options: AuthorizedCallOptions,
+  call: (accessToken: string) => Promise<BackendResult<T>>,
+): Promise<AuthorizedCallOutcome<T>> {
+  return authorizedCallWithTokens(
+    { backend: options.backend, tokens: getRequestTokens(options.req) },
+    call,
+  );
+}
+
+/**
  * Apply a refresh-rotation outcome to the response being returned.
  */
 export function applySessionOutcome(
@@ -158,7 +181,10 @@ export function bffErrorResponse(
 ): NextResponse {
   const status =
     statusOverride ??
-    (code === "unauthorized" || code === "invalid_refresh_token"
+    (code === "unauthorized" ||
+    code === "invalid_refresh_token" ||
+    code === "invalid_credentials" ||
+    code === "account_inactive"
       ? 401
       : code === "forbidden"
         ? 403
@@ -176,8 +202,10 @@ export function bffErrorResponse(
                   ? 422
                   : code === "rate_limited"
                     ? 429
-                    : code === "network_error"
-                      ? 502
-                      : 500);
+                    : code === "invitation_unavailable"
+                      ? 503
+                      : code === "network_error"
+                        ? 502
+                        : 500);
   return NextResponse.json({ ok: false, code, message, ...extra }, { status });
 }

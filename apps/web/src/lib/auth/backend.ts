@@ -200,7 +200,7 @@ export class BackendClient {
    * explain invitations are not enabled yet instead of failing cryptically.
    * A 404 whose detail mentions the invitation is a genuinely invalid token.
    */
-  acceptInvitation(
+  async acceptInvitation(
     accessToken: string,
     body: BackendInvitationAcceptRequest,
   ): Promise<BackendResult<BackendInvitationAcceptResponse>> {
