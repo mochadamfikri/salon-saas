@@ -8,41 +8,75 @@ Checkpoint A-D PASS.
 Checkpoint E belum selesai.
 
 ## Phase 2 Status
-**P2-A COMPLETED** ✓
+**P2-A AUDIT REMEDIATION COMPLETED** ✓
 
-### P2-A Deliverables
-- ✓ 5 tenant-scoped tables created
-- ✓ Alembic migration 5497f90af712
-- ✓ ORM models in app/models.py
-- ✓ 6 schema constraint tests (PASS)
-- ✓ 115 total tests PASS (Phase 1 regression + Phase 2)
-- ✓ Ruff + Black PASS
+### Audit Status
+- Initial submission: BLOCKED (remote HEAD 84529b9)
+- Remediation: COMPLETED
+- Awaiting: Auditor re-review
 
-### Tables Created
-1. **salon_services** - layanan salon (haircut, facial, dll)
-   - UNIQUE(salon_id, name)
-   - FK salon_id → salons
+### P2-A Remediation Deliverables
+- ✓ Contract-compliant schema (all audit findings addressed)
+- ✓ Migration 547d2dd43298 (clean, reversible)
+- ✓ 20 contract compliance tests
+- ✓ 129 total tests PASS (Phase 1 regression + Phase 2)
+- ✓ Ruff + format PASS
+
+### Schema Changes (Audit Remediation)
+1. **salon_services**
+   - Added: category (opt), currency DEFAULT 'IDR'
+   - Added: CHECK(duration_minutes > 0), CHECK(price_amount >= 0)
+   - Fixed: price_amount typing (Decimal)
+   - Removed: UNIQUE(salon_id, name)
+
+2. **staff_profiles**
+   - Added: phone (opt)
+   - Fixed: display_name now optional
+   - Documented: SalonMembership is authoritative source
+
+3. **staff_weekly_availability**
+   - Changed: day_of_week 0-6 (was 1-7)
+   - Added: CHECK(start_time < end_time), is_available boolean
+   - Documented: UNIQUE prevents exact duplicates only, NOT overlap
+
+4. **salon_customers**
+   - Fixed: email and phone now optional
+   - Removed: UNIQUE(salon_id, email)
+
+5. **Tenant isolation**
+   - Clarified: Application-layer invariant (P2-C enforcement)
+   - Database provides FK relationships only
+
+### Tables (Final Schema)
+1. **salon_services** - layanan salon
+   - CHECK(duration_minutes > 0)
+   - CHECK(price_amount >= 0)
+   - currency DEFAULT 'IDR'
+   - category OPTIONAL
+
 2. **staff_profiles** - profil extended staff
-   - UNIQUE(membership_id) - one-to-one dengan salon_memberships
-   - FK membership_id → salon_memberships
-3. **staff_service_assignments** - many-to-many staff ↔ services
+   - UNIQUE(membership_id) - one-to-one
+   - display_name, phone OPTIONAL
+
+3. **staff_service_assignments** - many-to-many
    - UNIQUE(staff_profile_id, salon_service_id)
-4. **staff_weekly_availability** - jadwal mingguan staff
-   - CHECK(day_of_week BETWEEN 1 AND 7)
-   - UNIQUE(staff_profile_id, day_of_week, start_time)
-5. **salon_customers** - customer terdaftar per salon
-   - UNIQUE(salon_id, email)
+
+4. **staff_weekly_availability** - jadwal mingguan
+   - CHECK(day_of_week BETWEEN 0 AND 6)
+   - CHECK(start_time < end_time)
+   - UNIQUE prevents exact duplicates only
+
+5. **salon_customers** - customer per salon
+   - email, phone OPTIONAL
+   - No uniqueness constraints
 
 ## Next Action
-P2-B: Service & Staff Management API Endpoints
-- POST /salons/{salon_id}/services
-- GET /salons/{salon_id}/services
-- PATCH /salons/{salon_id}/services/{service_id}
-- DELETE /salons/{salon_id}/services/{service_id}
-- POST /salons/{salon_id}/staff-profiles (create staff profile)
-- GET /salons/{salon_id}/staff-profiles
-- Tenant-scoped query enforcement
-- RBAC: owner/manager untuk mutasi, staff read-only
+**STOP - DO NOT START P2-B**
+
+Awaiting auditor re-review of remediation.
+
+After audit PASS:
+- P2-B: Service & Staff Management API Endpoints
 
 ## Rules (Masih Berlaku)
 - semua tenant-scoped via salon_id
@@ -53,6 +87,9 @@ P2-B: Service & Staff Management API Endpoints
 - jangan frontend
 - jangan production
 
-## Last Commit
-SHA: f169506
-Message: feat(phase2): P2-A Salon Operations Core - schema, migration, domain models
+## Last Commits
+SHA: 5e573e3 - style: format migration file
+SHA: 13a775d - fix(phase2): P2-A audit remediation - contract-compliant schema
+SHA: 91755ee - fix(phase2): P2-A audit remediation - contract-compliant schema (pre-format)
+
+**Remote HEAD:** 5e573e3cd39e9831bc62c4647a40a2727f2ef26c
