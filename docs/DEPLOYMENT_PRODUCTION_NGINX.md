@@ -109,6 +109,23 @@ sudo systemctl reload nginx
 
 ## API Configuration
 
+### Supported Topology
+
+**Phase 1 supports single-proxy topology only:**
+
+```
+Internet → Nginx (trusted) → API
+```
+
+The API trusts one Nginx instance that strips client headers and sets X-Forwarded-For to the real client IP.
+
+**Not supported in Phase 1:**
+- Multi-proxy chains: `CDN → WAF → Nginx → API`
+- Multiple load balancers in sequence
+- Complex proxy hierarchies
+
+For multi-proxy topologies, you would need to extend `_client_ip()` in `apps/api/app/core/rate_limit.py` to walk the proxy chain backwards, skipping known proxy IPs until reaching the first untrusted IP.
+
 ### 1. Identify Nginx Internal IP
 
 ```bash
@@ -131,16 +148,15 @@ docker network inspect <network_name> | grep Gateway
 **`.env` (production only):**
 
 ```env
-# REQUIRED in production behind Nginx/HAProxy
-# Comma-separated list of trusted proxy IPs
+# REQUIRED in production behind Nginx/HAProxy (single-proxy topology)
+# Single trusted proxy IP (Nginx's internal IP as seen by the API)
 TRUSTED_PROXIES=["127.0.0.1"]
 
 # Or for Docker Compose bridge network:
 TRUSTED_PROXIES=["172.18.0.1"]
-
-# Multiple proxies (HAProxy → Nginx chain):
-TRUSTED_PROXIES=["172.18.0.1", "10.0.1.50"]
 ```
+
+**IMPORTANT**: Phase 1 supports single-proxy topology only. Do not configure multiple proxy IPs unless you have extended the `_client_ip()` function to handle multi-proxy chain traversal.
 
 **Docker Compose example:**
 

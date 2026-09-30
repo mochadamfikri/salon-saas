@@ -473,41 +473,116 @@ def test_invitation_token_stored_hash_only(db_session: Session):
     assert raw_token not in list_response.text
 
 
-def test_duplicate_membership_rejection_does_not_consume_invitation(db_session: Session):
-    """409 duplicate rejection does not consume the invitation.
+def test_duplicate_membership_rejection_does_not_consume_invitation():
+    """A duplicate rejection is 409 and leaves both membership and invitation unchanged.
 
-    This test verifies the transaction semantics: when a duplicate membership
-    is detected, the service layer raises DuplicateMembershipError and rolls back
-    the transaction BEFORE marking the invitation accepted_at, so the invitation
-    remains redeemable.
-
-    Due to fixture transaction isolation (outer transaction rolls back ALL changes
-    at test end), we verify the production behavior by:
-    1. Confirming 409 response with correct detail message
-    2. Code review of service layer: invitation.accepted_at is set BEFORE flush,
-       but the entire transaction (including that assignment) is rolled back on
-       DuplicateMembershipError, so accepted_at never persists.
-    3. The database unique constraint ensures no duplicate membership is created.
+    This test deliberately uses independent, committed database sessions rather
+    than the rollback fixture so it can observe the durable state after the HTTP
+    request. All rows are removed in ``finally``.
     """
-    owner_user, owner_token = _create_user_and_login(db_session, "owner-noconsume@example.com")
-    salon = _create_salon(owner_token, "No Consume Salon")
+    from app.core.security import hash_password
+    from app.db import engine
+    from app.models import Salon, SalonInvitation, SalonMembership, User
+    from app.services.invitation import create_invitation
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import Session
 
-    existing_user, existing_token = _create_user_and_login(db_session, "noconsume@example.com")
-    existing_user_id = existing_user.id
-    _add_membership(db_session, salon["id"], existing_user_id, "staff")
+    db = Session(engine)
+    salon_id = owner_id = invitee_id = invitation_id = None
+    try:
+        owner = User(
+            email=f"owner-noconsume-{uuid.uuid4().hex}@example.com",
+            password_hash=hash_password("SecurePass123"),
+            is_active=True,
+        )
+        invitee = User(
+            email=f"noconsume-{uuid.uuid4().hex}@example.com",
+            password_hash=hash_password("SecurePass123"),
+            is_active=True,
+        )
+        db.add_all([owner, invitee])
+        db.flush()
+        salon = Salon(
+            name="No Consume Salon",
+            slug=f"no-consume-{uuid.uuid4().hex[:12]}",
+            created_by_user_id=owner.id,
+        )
+        db.add(salon)
+        db.flush()
+        db.add(
+            SalonMembership(
+                salon_id=salon.id,
+                user_id=invitee.id,
+                role="staff",
+                status="active",
+            )
+        )
+        invitation, raw_token = create_invitation(db, salon, invitee.email, "manager", owner.id)
+        db.commit()
+        salon_id, owner_id, invitee_id, invitation_id = (
+            salon.id,
+            owner.id,
+            invitee.id,
+            invitation.id,
+        )
 
-    invite_response = client.post(
-        f"/salons/{salon['id']}/invitations",
-        headers={"Authorization": f"Bearer {owner_token}"},
-        json={"email": "noconsume@example.com", "role": "manager"},
-    )
-    raw_token = invite_response.json()["token"]
+        login_response = client.post(
+            "/auth/login",
+            json={"email": invitee.email, "password": "SecurePass123"},
+        )
+        assert login_response.status_code == 200
+        accept_response = client.post(
+            "/invitations/accept",
+            headers={"Authorization": f"Bearer {login_response.json()['access_token']}"},
+            json={"token": raw_token},
+        )
 
-    # The critical assertion: duplicate membership is rejected with 409.
-    accept_response = client.post(
-        "/invitations/accept",
-        headers={"Authorization": f"Bearer {existing_token}"},
-        json={"token": raw_token},
-    )
-    assert accept_response.status_code == 409
-    assert "already has an active membership" in accept_response.json()["detail"].lower()
+        # Required contract invariant 1: HTTP conflict response.
+        assert accept_response.status_code == 409
+
+        db_verify = Session(engine)
+        try:
+            # Required invariant 2: no duplicate membership was inserted.
+            membership_count = db_verify.scalar(
+                select(func.count())
+                .select_from(SalonMembership)
+                .where(
+                    SalonMembership.salon_id == salon_id,
+                    SalonMembership.user_id == invitee_id,
+                )
+            )
+            assert membership_count == 1
+
+            # Required invariants 3-4: invitation survives and remains pending.
+            invitation_after = db_verify.get(SalonInvitation, invitation_id)
+            assert invitation_after is not None
+            assert invitation_after.accepted_at is None
+        finally:
+            db_verify.close()
+    finally:
+        db.close()
+        if salon_id is not None:
+            db_cleanup = Session(engine)
+            try:
+                # Delete auth_sessions first (FK constraint)
+                from app.models import AuthSession
+
+                db_cleanup.query(AuthSession).filter(
+                    AuthSession.user_id.in_([owner_id, invitee_id])
+                ).delete(synchronize_session=False)
+
+                db_cleanup.query(SalonMembership).filter(
+                    SalonMembership.salon_id == salon_id
+                ).delete(synchronize_session=False)
+                db_cleanup.query(SalonInvitation).filter(
+                    SalonInvitation.salon_id == salon_id
+                ).delete(synchronize_session=False)
+                db_cleanup.query(Salon).filter(Salon.id == salon_id).delete(
+                    synchronize_session=False
+                )
+                db_cleanup.query(User).filter(User.id.in_([owner_id, invitee_id])).delete(
+                    synchronize_session=False
+                )
+                db_cleanup.commit()
+            finally:
+                db_cleanup.close()

@@ -97,9 +97,17 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> RateLimitResu
 def _client_ip(request: Request) -> str:
     """Extract client IP from request, respecting trusted proxy configuration.
 
-    When trusted_proxies is configured and the direct peer matches a trusted IP,
-    we parse X-Forwarded-For and use the RIGHTMOST untrusted IP (the real client
-    IP as seen by the trusted proxy). Otherwise we use the direct TCP peer.
+    **Single-proxy topology only**: This implementation is designed for a single
+    trusted reverse proxy (Nginx or HAProxy) directly in front of the API. It
+    extracts the rightmost IP from X-Forwarded-For, which is correct when:
+    - Nginx strips any client-provided X-Forwarded-For
+    - Nginx sets X-Forwarded-For to the real client IP ($remote_addr)
+    - The API trusts only Nginx's internal IP
+
+    **Not supported**: Multi-proxy chains (e.g., CDN → WAF → Nginx → API) where
+    you need to traverse a known chain of proxies. For that topology, you would
+    need to walk backwards from the rightmost IP, skipping known proxy IPs until
+    reaching the first untrusted IP (the real client).
 
     SECURITY: An empty trusted_proxies list (the default) means we NEVER trust
     X-Forwarded-For, which is correct for direct-to-internet deployments and
@@ -123,13 +131,13 @@ def _client_ip(request: Request) -> str:
         return peer_ip
 
     # Peer is trusted: parse X-Forwarded-For. Format: "client, proxy1, proxy2"
-    # The rightmost IP is the one the trusted proxy saw (real client IP).
+    # For single-proxy topology, rightmost IP is the real client IP.
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
     if not forwarded_for:
         return peer_ip  # No header set, fall back to peer
 
     # Take the rightmost IP (strip whitespace). This is the client IP as seen
-    # by our trusted proxy, before the proxy appended itself to the chain.
+    # by our trusted proxy (single-proxy topology only).
     ips = [ip.strip() for ip in forwarded_for.split(",")]
     return ips[-1] if ips else peer_ip
 
