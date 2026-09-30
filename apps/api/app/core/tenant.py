@@ -86,7 +86,7 @@ def get_tenant_context(
     )
 
     if not membership or membership.status != "active":
-        # C-5: Suspended/inactive membership must not confirm tenant access
+        # C-5: Suspended/inactive membership does not confirm tenant access (returns 404 like non-member)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Salon not found",
