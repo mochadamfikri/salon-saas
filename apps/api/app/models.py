@@ -7,6 +7,7 @@ JWTs, password hashing, and API endpoints belong to later Phase 1 tasks.
 
 import uuid
 from datetime import datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
@@ -200,7 +201,10 @@ class SalonService(TimestampMixin, Base):
     """Tenant-scoped service offering (haircut, facial, etc)."""
 
     __tablename__ = "salon_services"
-    __table_args__ = (UniqueConstraint("salon_id", "name", name="uq_salon_services_salon_name"),)
+    __table_args__ = (
+        CheckConstraint("duration_minutes > 0", name="ck_salon_services_duration_positive"),
+        CheckConstraint("price_amount >= 0", name="ck_salon_services_price_non_negative"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     salon_id: Mapped[uuid.UUID] = mapped_column(
@@ -208,8 +212,10 @@ class SalonService(TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(String(1000), nullable=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
-    price_amount: Mapped[int] = mapped_column(Numeric(12, 2), nullable=False)
+    price_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="IDR")
     is_active: Mapped[bool] = mapped_column(nullable=False, server_default="true")
 
     salon: Mapped["Salon"] = relationship(back_populates="services")
@@ -219,7 +225,11 @@ class SalonService(TimestampMixin, Base):
 
 
 class StaffProfile(TimestampMixin, Base):
-    """Extended staff profile (one-to-one with SalonMembership)."""
+    """Extended staff profile (one-to-one with SalonMembership).
+    
+    SalonMembership is the authoritative source for user_id and salon_id.
+    This profile extends membership with operational booking metadata.
+    """
 
     __tablename__ = "staff_profiles"
 
@@ -231,7 +241,8 @@ class StaffProfile(TimestampMixin, Base):
         unique=True,
         index=True,
     )
-    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
     bio: Mapped[str] = mapped_column(String(1000), nullable=True)
     photo_url: Mapped[str] = mapped_column(String(512), nullable=True)
     is_bookable: Mapped[bool] = mapped_column(nullable=False, server_default="true")
@@ -276,14 +287,20 @@ class StaffServiceAssignment(TimestampMixin, Base):
 
 
 class StaffWeeklyAvailability(TimestampMixin, Base):
-    """Weekly recurring availability schedule for staff."""
+    """Weekly recurring availability schedule for staff.
+    
+    Note: UNIQUE(staff_profile_id, day_of_week, start_time) prevents exact duplicates only.
+    It does NOT prevent overlapping time slots. Overlap validation is an application-layer
+    concern to be implemented in P2-D service logic with concurrency-safe tests.
+    """
 
     __tablename__ = "staff_weekly_availability"
     __table_args__ = (
         CheckConstraint(
-            "day_of_week >= 1 AND day_of_week <= 7",
+            "day_of_week >= 0 AND day_of_week <= 6",
             name="ck_staff_weekly_availability_day_of_week",
         ),
+        CheckConstraint("start_time < end_time", name="ck_staff_weekly_availability_time_order"),
         UniqueConstraint(
             "staff_profile_id",
             "day_of_week",
@@ -302,23 +319,28 @@ class StaffWeeklyAvailability(TimestampMixin, Base):
     day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    is_available: Mapped[bool] = mapped_column(nullable=False, server_default="true")
 
     staff_profile: Mapped["StaffProfile"] = relationship(back_populates="weekly_availability")
 
 
 class SalonCustomer(TimestampMixin, Base):
-    """Tenant-scoped customer record."""
+    """Tenant-scoped customer record.
+    
+    Customers are scoped per salon. Email and phone are optional - a customer
+    can be registered with just a name (walk-in scenario). Email/phone normalization
+    and duplicate detection are service-layer concerns.
+    """
 
     __tablename__ = "salon_customers"
-    __table_args__ = (UniqueConstraint("salon_id", "email", name="uq_salon_customers_salon_email"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     salon_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("salons.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    email: Mapped[str] = mapped_column(String(320), nullable=False)
-    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
     notes: Mapped[str] = mapped_column(String(1000), nullable=True)
 
     salon: Mapped["Salon"] = relationship(back_populates="customers")
