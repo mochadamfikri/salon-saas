@@ -596,6 +596,62 @@ def test_owner_can_update_any_profile_personal_fields(
     assert response.json()["display_name"] == "Updated by Owner"
 
 
+def test_manager_can_update_any_profile_personal_fields(
+    db_session: Session, staff_profile_users: dict[str, object]
+) -> None:
+    salon = staff_profile_users["salon"]
+    staff1_membership = staff_profile_users["staff1_membership"]
+    assert isinstance(salon, Salon)
+    assert isinstance(staff1_membership, SalonMembership)
+
+    # Create profile for staff1
+    response_create = client.post(
+        f"/salons/{salon.id}/staff-profiles",
+        headers=_auth(str(staff_profile_users["owner_token"])),
+        json={"membership_id": str(staff1_membership.id)},
+    )
+    profile_id = response_create.json()["id"]
+
+    # Manager updates staff1's profile
+    response = client.patch(
+        f"/salons/{salon.id}/staff-profiles/{profile_id}",
+        headers=_auth(str(staff_profile_users["manager_token"])),
+        json={"display_name": "Updated by Manager"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "Updated by Manager"
+
+
+def test_membership_id_cannot_be_changed_via_patch(
+    db_session: Session, staff_profile_users: dict[str, object]
+) -> None:
+    """membership_id is immutable and extra fields are rejected."""
+    salon = staff_profile_users["salon"]
+    staff1_membership = staff_profile_users["staff1_membership"]
+    staff2_membership = staff_profile_users["staff2_membership"]
+    assert isinstance(salon, Salon)
+    assert isinstance(staff1_membership, SalonMembership)
+    assert isinstance(staff2_membership, SalonMembership)
+
+    # Create profile for staff1
+    response_create = client.post(
+        f"/salons/{salon.id}/staff-profiles",
+        headers=_auth(str(staff_profile_users["owner_token"])),
+        json={"membership_id": str(staff1_membership.id)},
+    )
+    profile_id = response_create.json()["id"]
+
+    # Try to change membership_id (rejected as extra field)
+    response = client.patch(
+        f"/salons/{salon.id}/staff-profiles/{profile_id}",
+        headers=_auth(str(staff_profile_users["owner_token"])),
+        json={"membership_id": str(staff2_membership.id)},
+    )
+
+    assert response.status_code == 422
+
+
 # ============================================================================
 # Staff-Service Assignment Tests
 # ============================================================================

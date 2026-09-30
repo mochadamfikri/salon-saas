@@ -20,7 +20,10 @@ class StaffProfileUpdateRequest(BaseModel):
     - Staff: their own profile only
 
     is_bookable can only be updated by Owner/Manager.
+    Immutable fields are rejected rather than silently ignored.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = Field(default=None, max_length=200)
     phone: str | None = Field(default=None, max_length=20)
