@@ -24,7 +24,7 @@ def _enable_rate_limiting(monkeypatch):
     """Re-enable rate limiting for this module with an isolated fakeredis."""
     monkeypatch.setattr(
         "app.core.rate_limit.get_settings",
-        lambda: SimpleNamespace(rate_limit_enabled=True),
+        lambda: SimpleNamespace(rate_limit_enabled=True, trusted_proxies=[]),
     )
     fake = fakeredis.FakeStrictRedis(decode_responses=True)
     set_redis_client(fake)
@@ -104,11 +104,83 @@ def test_rate_limit_dependency_keys_by_client_ip():
 def test_rate_limit_disabled_setting_bypasses(monkeypatch):
     monkeypatch.setattr(
         "app.core.rate_limit.get_settings",
-        lambda: SimpleNamespace(rate_limit_enabled=False),
+        lambda: SimpleNamespace(rate_limit_enabled=False, trusted_proxies=[]),
     )
     dependency = rate_limit(limit=1, window_seconds=60, prefix="dep-disabled")
     for _ in range(5):
         dependency(_request())  # no 429 despite limit=1
+
+
+def test_client_ip_defaults_to_peer_when_no_trusted_proxies(monkeypatch):
+    """Without trusted proxies, direct peer is used and headers are ignored."""
+    monkeypatch.setattr(
+        "app.core.rate_limit.get_settings",
+        lambda: SimpleNamespace(rate_limit_enabled=True, trusted_proxies=[]),
+    )
+    req = Request(
+        {
+            "type": "http",
+            "client": ("198.51.100.1", 5000),
+            "headers": [(b"x-forwarded-for", b"203.0.113.195")],
+        }
+    )
+    from app.core.rate_limit import _client_ip
+
+    assert _client_ip(req) == "198.51.100.1"
+
+
+def test_client_ip_untrusted_peer_ignores_x_forwarded_for(monkeypatch):
+    """If peer is not in trusted_proxies, X-Forwarded-For is ignored."""
+    monkeypatch.setattr(
+        "app.core.rate_limit.get_settings",
+        lambda: SimpleNamespace(rate_limit_enabled=True, trusted_proxies=["127.0.0.1"]),
+    )
+    req = Request(
+        {
+            "type": "http",
+            "client": ("198.51.100.5", 5000),
+            "headers": [(b"x-forwarded-for", b"203.0.113.195")],
+        }
+    )
+    from app.core.rate_limit import _client_ip
+
+    assert _client_ip(req) == "198.51.100.5"
+
+
+def test_client_ip_trusted_peer_extracts_rightmost_forwarded_for(monkeypatch):
+    """When peer is trusted, rightmost IP in X-Forwarded-For is extracted."""
+    monkeypatch.setattr(
+        "app.core.rate_limit.get_settings",
+        lambda: SimpleNamespace(rate_limit_enabled=True, trusted_proxies=["127.0.0.1"]),
+    )
+    req = Request(
+        {
+            "type": "http",
+            "client": ("127.0.0.1", 5000),
+            "headers": [(b"x-forwarded-for", b"10.0.0.1, 203.0.113.50")],
+        }
+    )
+    from app.core.rate_limit import _client_ip
+
+    assert _client_ip(req) == "203.0.113.50"
+
+
+def test_client_ip_trusted_peer_empty_header_falls_back_to_peer(monkeypatch):
+    """When peer is trusted but header is missing/empty, peer IP is used."""
+    monkeypatch.setattr(
+        "app.core.rate_limit.get_settings",
+        lambda: SimpleNamespace(rate_limit_enabled=True, trusted_proxies=["127.0.0.1"]),
+    )
+    req = Request(
+        {
+            "type": "http",
+            "client": ("127.0.0.1", 5000),
+            "headers": [],
+        }
+    )
+    from app.core.rate_limit import _client_ip
+
+    assert _client_ip(req) == "127.0.0.1"
 
 
 def test_password_reset_request_rate_limited_end_to_end(db_session):

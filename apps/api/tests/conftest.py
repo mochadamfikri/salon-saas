@@ -22,7 +22,7 @@ def _disable_rate_limiting(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setattr(
         "app.core.rate_limit.get_settings",
-        lambda: SimpleNamespace(rate_limit_enabled=False),
+        lambda: SimpleNamespace(rate_limit_enabled=False, trusted_proxies=[]),
     )
 
 

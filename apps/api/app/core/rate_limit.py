@@ -95,9 +95,43 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> RateLimitResu
 
 
 def _client_ip(request: Request) -> str:
-    if request.client is not None:
-        return request.client.host
-    return "unknown"
+    """Extract client IP from request, respecting trusted proxy configuration.
+
+    When trusted_proxies is configured and the direct peer matches a trusted IP,
+    we parse X-Forwarded-For and use the RIGHTMOST untrusted IP (the real client
+    IP as seen by the trusted proxy). Otherwise we use the direct TCP peer.
+
+    SECURITY: An empty trusted_proxies list (the default) means we NEVER trust
+    X-Forwarded-For, which is correct for direct-to-internet deployments and
+    prevents IP spoofing. Only set trusted_proxies in production when the app
+    is behind a reverse proxy that strips + rewrites X-Forwarded-For.
+    """
+    settings = get_settings()
+
+    # Default: use direct TCP peer (no proxy trust).
+    if request.client is None:
+        return "unknown"
+
+    peer_ip = request.client.host
+
+    # If no trusted proxies configured, use peer IP directly (safe default).
+    if not settings.trusted_proxies:
+        return peer_ip
+
+    # If peer is NOT a trusted proxy, use peer IP (don't trust its headers).
+    if peer_ip not in settings.trusted_proxies:
+        return peer_ip
+
+    # Peer is trusted: parse X-Forwarded-For. Format: "client, proxy1, proxy2"
+    # The rightmost IP is the one the trusted proxy saw (real client IP).
+    forwarded_for = request.headers.get("x-forwarded-for", "").strip()
+    if not forwarded_for:
+        return peer_ip  # No header set, fall back to peer
+
+    # Take the rightmost IP (strip whitespace). This is the client IP as seen
+    # by our trusted proxy, before the proxy appended itself to the chain.
+    ips = [ip.strip() for ip in forwarded_for.split(",")]
+    return ips[-1] if ips else peer_ip
 
 
 def rate_limit(

@@ -181,9 +181,15 @@ def accept_invitation(
     # Mark invitation accepted (one-time semantics).
     invitation.accepted_at = now
 
+    # Capture primitive values BEFORE flush: if the flush raises IntegrityError
+    # and we rollback, the ORM objects (invitation, accepting_user) become
+    # expired/detached. The post-rollback re-query must use primitive UUIDs.
+    salon_id_primitive = invitation.salon_id
+    user_id_primitive = accepting_user.id
+
     membership = SalonMembership(
-        salon_id=invitation.salon_id,
-        user_id=accepting_user.id,
+        salon_id=salon_id_primitive,
+        user_id=user_id_primitive,
         role=invitation.role,
         status="active",
         joined_at=now,
@@ -199,8 +205,8 @@ def accept_invitation(
         winner = db.execute(
             select(SalonMembership).where(
                 and_(
-                    SalonMembership.salon_id == invitation.salon_id,
-                    SalonMembership.user_id == accepting_user.id,
+                    SalonMembership.salon_id == salon_id_primitive,
+                    SalonMembership.user_id == user_id_primitive,
                 )
             )
         ).scalar_one_or_none()

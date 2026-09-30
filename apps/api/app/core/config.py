@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     rate_limit_password_reset: int = Field(default=5, ge=1)
     rate_limit_invitation_accept: int = Field(default=20, ge=1)
 
+    # Trusted proxy configuration for X-Forwarded-For parsing.
+    # PRODUCTION: Set to the internal IP(s) of your reverse proxy (Nginx/HAProxy).
+    # EMPTY (default): Use request.client.host (direct TCP peer) — safe for
+    # development and for production deployments where the app is NOT behind
+    # a proxy. Never trust X-Forwarded-For from untrusted sources.
+    trusted_proxies: list[str] = Field(default_factory=list)
+
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
