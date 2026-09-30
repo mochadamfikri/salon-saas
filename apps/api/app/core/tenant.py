@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth_dependencies import get_current_user
 from app.core.dependencies import get_db
+from app.core.rbac import Permission, RBACPolicy
 from app.models import Salon, SalonMembership, User
 
 
@@ -27,6 +28,10 @@ class TenantContext:
     def role(self) -> str:
         """User's role in this salon."""
         return self.membership.role
+
+    def require_permission(self, permission: Permission) -> None:
+        """Raise 403 if the current user lacks the required permission."""
+        RBACPolicy.require(self.role, permission)
 
     def require_owner(self) -> None:
         """Raise 403 if the current user is not an owner."""
@@ -61,8 +66,8 @@ def get_tenant_context(
         TenantContext with salon, membership, user, db.
 
     Raises:
-        HTTPException 403: No active membership or access denied.
-        HTTPException 404: Salon not found.
+        HTTPException 404: Salon not found OR user has no membership (C-3: cross-tenant hiding).
+        HTTPException 403: User has membership but it's not active.
     """
     salon = db.get(Salon, salon_id)
     if not salon:
@@ -76,15 +81,21 @@ def get_tenant_context(
         .filter(
             SalonMembership.salon_id == salon_id,
             SalonMembership.user_id == user.id,
-            SalonMembership.status == "active",
         )
         .first()
     )
 
     if not membership:
+        # C-3: Return 404 for cross-tenant to hide salon existence from non-members
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Salon not found",
+        )
+
+    if membership.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: no active membership in this salon",
+            detail="Membership is not active",
         )
 
     return TenantContext(salon=salon, membership=membership, user=user, db=db)

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth_dependencies import get_current_user
 from app.core.dependencies import get_db
+from app.core.rbac import Permission, RBACPolicy
 from app.core.tenant import TenantContext, get_tenant_context
 from app.models import SalonMembership, User
 from app.schemas.tenant import (
@@ -62,7 +63,8 @@ def get_my_salons(
 def list_salon_members(
     tenant: Annotated[TenantContext, Depends(get_tenant_context)],
 ) -> list[MembershipResponse]:
-    """List all members of a salon (requires active membership)."""
+    """List all members of a salon (owner or manager only)."""
+    tenant.require_permission(Permission.VIEW_MEMBERS)
     members = get_salon_members(tenant.db, tenant.salon.id)
     return [MembershipResponse.model_validate(m) for m in members]
 
@@ -74,16 +76,16 @@ def update_member_role_endpoint(
     payload: MemberRoleUpdateRequest,
     tenant: Annotated[TenantContext, Depends(get_tenant_context)],
 ) -> MembershipResponse:
-    """Update a member's role (owner only)."""
-    tenant.require_owner()
-
-    # Verify membership belongs to this salon
+    """Update a member's role (owner can manage all non-owners; manager can manage staff only)."""
     membership = tenant.db.get(SalonMembership, membership_id)
     if not membership or membership.salon_id != salon_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Member not found in this salon",
         )
+
+    # C-2: RBAC checks actor+target+requested_role
+    RBACPolicy.require_member_mutation(tenant.role, membership.role, payload.role)
 
     try:
         updated = update_member_role(tenant.db, membership_id, payload.role)
@@ -103,16 +105,16 @@ def remove_member_endpoint(
     membership_id: UUID,
     tenant: Annotated[TenantContext, Depends(get_tenant_context)],
 ) -> dict[str, str]:
-    """Remove a member from salon (owner only)."""
-    tenant.require_owner()
-
-    # Verify membership belongs to this salon
+    """Remove a member from salon (owner can remove non-owners; manager can remove staff only)."""
     membership = tenant.db.get(SalonMembership, membership_id)
     if not membership or membership.salon_id != salon_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Member not found in this salon",
         )
+
+    # C-2: RBAC checks actor+target
+    RBACPolicy.require_member_mutation(tenant.role, membership.role)
 
     try:
         remove_member(tenant.db, membership_id)

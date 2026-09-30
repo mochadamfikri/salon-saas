@@ -310,5 +310,5 @@ def test_cannot_access_other_salon(db_session: Session, auth_user: tuple[User, s
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert response.status_code == 403
-    assert "access" in response.json()["detail"].lower()
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()

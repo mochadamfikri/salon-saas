@@ -4,18 +4,29 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+RESERVED_SALON_SLUGS = frozenset({"admin", "api", "auth", "docs", "health", "me", "salons"})
+
 
 class SalonCreateRequest(BaseModel):
-    """Payload for creating a salon."""
+    """Payload for creating a salon; slug is optional."""
 
     name: str = Field(min_length=1, max_length=120)
-    slug: str = Field(min_length=3, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    slug: str | None = Field(
+        default=None, min_length=3, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    )
 
-    @field_validator("slug")
+    @field_validator("slug", mode="before")
     @classmethod
-    def normalize_slug(cls, value: str) -> str:
-        """Normalize whitespace and require a lowercase URL-safe slug."""
-        return value.strip().lower()
+    def normalize_and_validate_explicit_slug(cls, value: object) -> str | None:
+        """Normalize explicit slugs and reject protected routes."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Slug must be a string")
+        normalized = value.strip().lower()
+        if normalized in RESERVED_SALON_SLUGS:
+            raise ValueError("Slug is reserved")
+        return normalized
 
 
 class SalonResponse(BaseModel):
