@@ -1,14 +1,19 @@
 # Core framework
 fastapi==0.141.1
 uvicorn[standard]==0.34.0
-pydantic==2.13.5
+pydantic[email]==2.13.5
 pydantic-settings==2.15.0
+python-multipart==0.0.20
 
 # Infrastructure clients
 sqlalchemy==2.0.36
 alembic==1.20.0
 psycopg[binary]==3.3.6
 redis==5.2.1
+
+# Authentication and security
+pwdlib[argon2]==0.3.1
+PyJWT[crypto]==2.15.1
 
 # Development and test tooling
 pytest==8.3.4
