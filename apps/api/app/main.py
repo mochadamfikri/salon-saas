@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.routers.auth import router as auth_router
+from app.routers.tenant import router as tenant_router
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -17,6 +18,7 @@ app = FastAPI(
     redoc_url=None,
 )
 app.include_router(auth_router)
+app.include_router(tenant_router)
 
 
 @app.get("/health", tags=["system"])
