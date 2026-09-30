@@ -12,7 +12,7 @@ import {
   createBackendClient,
   type AuthorizedCallOutcome,
 } from "./bff";
-import type { BackendErrorCode } from "./backend";
+import type { BackendErrorCode, FetchImpl } from "./backend";
 import type { BackendTokenPair } from "./contracts";
 import type { SessionTokens } from "./cookies";
 import { invitationStateFor, uiMessageFor } from "./ui-messages";
@@ -36,17 +36,30 @@ export interface InvitationAcceptOutcome {
   refreshedTokens?: BackendTokenPair;
 }
 
+export interface AcceptInvitationOptions {
+  fetchImpl?: FetchImpl;
+  /**
+   * When false, no refresh rotation is attempted. Server Components MUST
+   * pass false: they cannot persist a rotated pair, and with rotating
+   * refresh tokens + reuse detection an unpersisted rotation strands the
+   * browser with a dead refresh token (F-3). Route Handlers (which persist
+   * via setAuthCookies) leave this true.
+   */
+  allowRefresh?: boolean;
+}
+
 export async function acceptInvitationOutcome(
   tokens: SessionTokens,
   rawToken: string,
-  fetchImpl?: typeof fetch,
+  options?: AcceptInvitationOptions,
 ): Promise<InvitationAcceptOutcome> {
-  const backend = createBackendClient(fetchImpl);
+  const backend = createBackendClient(options?.fetchImpl);
   const call: AuthorizedCallOutcome<{
     membership?: InvitationAcceptBody["membership"];
     salon?: InvitationAcceptBody["salon"];
-  }> = await authorizedCallWithTokens({ backend, tokens }, (accessToken) =>
-    backend.acceptInvitation(accessToken, { token: rawToken }),
+  }> = await authorizedCallWithTokens(
+    { backend, tokens, allowRefresh: options?.allowRefresh },
+    (accessToken) => backend.acceptInvitation(accessToken, { token: rawToken }),
   );
 
   const session: Pick<InvitationAcceptOutcome, "sessionInvalidated" | "refreshedTokens"> = {

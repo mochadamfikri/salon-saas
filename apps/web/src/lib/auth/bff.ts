@@ -90,6 +90,14 @@ export interface AuthorizedCallOptions {
 export interface AuthorizedCallTokensOptions {
   backend: BackendClient;
   tokens: SessionTokens;
+  /**
+   * When false, the call never attempts a refresh rotation. Use this when
+   * the caller cannot persist a rotated pair (e.g. a React Server
+   * Component): with rotating refresh tokens + reuse detection, an
+   * unpersisted rotation would leave the browser holding a dead refresh
+   * token. Defaults to true.
+   */
+  allowRefresh?: boolean;
 }
 
 export interface AuthorizedCallOutcome<T> {
@@ -104,6 +112,10 @@ export interface AuthorizedCallOutcome<T> {
  * Run a backend call with an access token, performing at most ONE refresh
  * attempt when the access token is missing or rejected (401).
  *
+ * When `options.allowRefresh` is false, no refresh is attempted at all: the
+ * 401/unauthorized result is returned as-is. Callers that cannot persist a
+ * rotated pair (Server Components) must pass false — see F-3.
+ *
  * Never throws for auth problems. The caller applies `refreshedTokens` /
  * `sessionInvalidated` to its own response via setAuthCookies/clearAuthCookies.
  */
@@ -111,12 +123,18 @@ export async function authorizedCallWithTokens<T>(
   options: AuthorizedCallTokensOptions,
   call: (accessToken: string) => Promise<BackendResult<T>>,
 ): Promise<AuthorizedCallOutcome<T>> {
-  const { backend, tokens } = options;
+  const { backend, tokens, allowRefresh = true } = options;
 
   if (tokens.accessToken) {
     const first = await call(tokens.accessToken);
-    if (first.ok || first.status !== 401) return { result: first };
+    if (first.ok || first.status !== 401 || !allowRefresh) return { result: first };
     // 401 with an access token: fall through to a single refresh attempt.
+  }
+
+  if (!allowRefresh) {
+    return {
+      result: { ok: false, code: "unauthorized", status: 401, detail: "No session" },
+    };
   }
 
   if (!tokens.refreshToken) {

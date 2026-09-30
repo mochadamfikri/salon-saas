@@ -28,7 +28,9 @@ describe("acceptInvitationOutcome", () => {
       return jsonResponse(200, { id: "u1" });
     }) as unknown as typeof fetch;
 
-    const outcome = await acceptInvitationOutcome(TOKENS, "raw-token", fetchImpl);
+    const outcome = await acceptInvitationOutcome(TOKENS, "raw-token", {
+      fetchImpl,
+    });
     expect(outcome.httpStatus).toBe(200);
     expect(outcome.body).toMatchObject({
       ok: true,
@@ -42,11 +44,9 @@ describe("acceptInvitationOutcome", () => {
 
   it("asks for login when there is no session", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, {})) as unknown as typeof fetch;
-    const outcome = await acceptInvitationOutcome(
-      { accessToken: undefined, refreshToken: undefined },
-      "raw-token",
+    const outcome = await acceptInvitationOutcome({ accessToken: undefined, refreshToken: undefined }, "raw-token", {
       fetchImpl,
-    );
+    });
     expect(outcome.httpStatus).toBe(401);
     expect(outcome.body.state).toBe("login_required");
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -65,7 +65,9 @@ describe("acceptInvitationOutcome", () => {
         if (String(url).endsWith("/auth/me")) return jsonResponse(200, { id: "u1" });
         return jsonResponse(backendStatus, { detail });
       }) as unknown as typeof fetch;
-      const outcome = await acceptInvitationOutcome(TOKENS, "tok", fetchImpl);
+      const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
       expect(outcome.httpStatus).toBe(expectedStatus);
       expect(outcome.body.state).toBe(expectedState);
       expect(outcome.body.message).toBeTruthy();
@@ -78,7 +80,9 @@ describe("acceptInvitationOutcome", () => {
       if (String(url).endsWith("/auth/me")) return jsonResponse(200, { id: "u1" });
       return jsonResponse(404, { detail: "Not Found" });
     }) as unknown as typeof fetch;
-    const outcome = await acceptInvitationOutcome(TOKENS, "tok", fetchImpl);
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
     expect(outcome.httpStatus).toBe(503);
     expect(outcome.body).toMatchObject({ ok: false, state: "error", code: "invitation_unavailable" });
   });
@@ -93,7 +97,9 @@ describe("acceptInvitationOutcome", () => {
       }
       return jsonResponse(404, {});
     }) as unknown as typeof fetch;
-    const outcome = await acceptInvitationOutcome(TOKENS, "tok", fetchImpl);
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
     expect(outcome.httpStatus).toBe(401);
     expect(outcome.body.state).toBe("login_required");
     expect(outcome.sessionInvalidated).toBe(true);
@@ -117,9 +123,51 @@ describe("acceptInvitationOutcome", () => {
       }
       return jsonResponse(404, {});
     }) as unknown as typeof fetch;
-    const outcome = await acceptInvitationOutcome(TOKENS, "tok", fetchImpl);
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+    });
     expect(outcome.httpStatus).toBe(200);
     expect(outcome.body.state).toBe("success");
     expect(outcome.refreshedTokens?.access_token).toBe("fresh-at");
+  });
+
+  it("with allowRefresh:false never rotates, even when refresh could succeed (F-3)", async () => {
+    // The /invite/accept Server Component cannot persist a rotated pair, so
+    // it must not trigger a rotation: fail closed instead of stranding the
+    // browser with a rotated-out refresh token.
+    const seen: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      seen.push(String(url));
+      if (String(url).endsWith("/invitations/accept")) {
+        return jsonResponse(401, { detail: "Token has expired" });
+      }
+      if (String(url).endsWith("/auth/refresh")) {
+        return jsonResponse(200, {
+          access_token: "fresh-at",
+          refresh_token: "fresh-rt",
+          token_type: "bearer",
+        });
+      }
+      return jsonResponse(404, {});
+    }) as unknown as typeof fetch;
+    const outcome = await acceptInvitationOutcome(TOKENS, "tok", {
+      fetchImpl,
+      allowRefresh: false,
+    });
+    expect(seen.some((u) => u.endsWith("/auth/refresh"))).toBe(false);
+    expect(outcome.refreshedTokens).toBeUndefined();
+    expect(outcome.sessionInvalidated).toBe(false);
+    expect(outcome.httpStatus).toBe(401);
+  });
+
+  it("with allowRefresh:false and no access token, does not refresh either", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {})) as unknown as typeof fetch;
+    const outcome = await acceptInvitationOutcome(
+      { accessToken: undefined, refreshToken: "rt1" },
+      "tok",
+      { fetchImpl, allowRefresh: false },
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(outcome.body.state).toBe("login_required");
   });
 });

@@ -74,6 +74,32 @@ function loginRedirect(req: NextRequest, nextPath?: string): NextResponse {
 }
 
 /**
+ * Forward the request with a freshly rotated token pair so the downstream
+ * page renders against the new session without another redirect, and
+ * persist the pair on the outgoing response.
+ *
+ * INVARIANT (F-3): a successful refresh rotation is ALWAYS persisted to the
+ * browser response. There is no code path that rotates without persisting.
+ */
+function nextWithFreshSession(
+  req: NextRequest,
+  tokens: BackendTokenPair,
+  nodeEnv: string | undefined,
+): NextResponse {
+  const headers = new Headers(req.headers);
+  headers.set(
+    "cookie",
+    withSessionTokens(req.headers.get("cookie"), {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    }),
+  );
+  const res = NextResponse.next({ request: { headers } });
+  setAuthCookies(res, tokens, nodeEnv);
+  return res;
+}
+
+/**
  * Invitation entry point. Parks `?token=` server-side and strips it from
  * the URL; unauthenticated visitors continue through /login with the
  * invitation held server-side (never in the auth URL).
@@ -82,18 +108,34 @@ async function handleInvite(req: NextRequest, nodeEnv: string | undefined): Prom
   const rawToken = req.nextUrl.searchParams.get("token");
   const session = await resolveSession(req);
 
-  const parkToken = (res: NextResponse): NextResponse => {
+  const parkToken = async (res: NextResponse): Promise<NextResponse> => {
     if (rawToken) {
-      const nonce = createInviteContinuation(rawToken);
-      res.cookies.set(INVITE_CONTINUATION_COOKIE, nonce, {
-        ...inviteContinuationCookieAttributes(nodeEnv),
-      });
+      try {
+        const nonce = await createInviteContinuation(rawToken);
+        res.cookies.set(INVITE_CONTINUATION_COOKIE, nonce, {
+          ...inviteContinuationCookieAttributes(nodeEnv),
+        });
+      } catch {
+        // Store unavailable: continue without a continuation nonce. The
+        // visitor can re-open the invite link after login (the page then
+        // renders the graceful missing_token state). Never log the token.
+      }
     }
     return res;
   };
 
   if (session.kind === "valid" || session.kind === "refreshed") {
-    if (!rawToken) return NextResponse.next();
+    if (!rawToken) {
+      // F-3: a refreshed session MUST have its fresh pair persisted —
+      // returning NextResponse.next() bare would leave the browser holding
+      // the rotated-out refresh token. The forwarded request also carries
+      // the fresh cookies so the page never needs its own (unpersistable)
+      // refresh.
+      if (session.kind === "refreshed") {
+        return nextWithFreshSession(req, session.tokens, nodeEnv);
+      }
+      return NextResponse.next();
+    }
     // Authenticated: strip the token from the URL at once; the page
     // consumes the parked nonce server-side.
     const res = NextResponse.redirect(new URL("/invite/accept", req.url));
@@ -135,17 +177,7 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
   if (session.kind === "valid") return NextResponse.next();
   if (session.kind === "refreshed") {
     // Forward with fresh tokens so the page renders without another redirect.
-    const headers = new Headers(req.headers);
-    headers.set(
-      "cookie",
-      withSessionTokens(req.headers.get("cookie"), {
-        accessToken: session.tokens.access_token,
-        refreshToken: session.tokens.refresh_token,
-      }),
-    );
-    const res = NextResponse.next({ request: { headers } });
-    setAuthCookies(res, session.tokens, nodeEnv);
-    return res;
+    return nextWithFreshSession(req, session.tokens, nodeEnv);
   }
   const res = loginRedirect(req);
   clearAuthCookies(res, nodeEnv);
