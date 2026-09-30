@@ -1,5 +1,6 @@
 """Pydantic schemas for invitation endpoints."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -22,10 +23,10 @@ class InvitationResponse(BaseModel):
     email: str
     role: str
     invited_by_user_id: UUID
-    created_at: str
-    expires_at: str
-    accepted_at: str | None
-    revoked_at: str | None
+    created_at: datetime
+    expires_at: datetime
+    accepted_at: datetime | None
+    revoked_at: datetime | None
 
 
 class InvitationAcceptRequest(BaseModel):
