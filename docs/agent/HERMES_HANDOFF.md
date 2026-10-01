@@ -11,46 +11,57 @@ Checkpoint E closure tracks separately.
 **PHASE 2 CLOSURE: FINAL PASS** (audited under sha `c08e42d09407f8493e64e4ad8b21ff43c01b6e6d`)
 
 ## Phase 3 Status
-**P3-B: READY FOR AUDIT (revision `REV-P3-B-49d6bc29` applied; awaiting re-audit)**
+**P3-C: READY FOR AUDIT**
 
 ### Checkpoint Status Summary
 - P3-A (Booking Domain & Lifecycle): FINAL PASS (audited under sha `c5368f42fc94fc17c01f1281f9a01ba44eee2ea4`)
-- P3-B (Availability & Capability): READY FOR AUDIT (revision applied at sha `c69c4c6`)
-  - Capability validation: `validate_appointment_capability` (service active, staff bookable, assignment exists)
-  - Weekly availability resolver: `validate_appointment_availability` (timezone-aware, local slot boundaries)
-  - Overlap engine: `find_overlapping_appointment`, `validate_appointment_conflict` (canonical predicate, adjacency allowed, cancelled ignored)
-  - Concurrency: `_acquire_staff_booking_lock` via PostgreSQL `pg_advisory_xact_lock`
-  - Integration: `create_appointment` enriched with full validation chain and DST-safe UTC normalization
-  - Audit remediation: UTC normalization before duration arithmetic to preserve exact duration across DST transitions
-  - Tests: `apps/api/tests/test_appointment_p3b.py` (27 tests including 3 DST transition tests)
-  - Report: `docs/reports/phase3-p3b-completion-report.md`
-- P3-C (Appointment API): WAITING_DEPENDENCY
+- P3-B (Availability & Capability): FINAL PASS (audited under sha `d1b60a769359cc33868d1ed263c36116a7888ea9`)
+- P3-C (Appointment API): READY FOR AUDIT (implemented at sha `0059845`)
 - P3-D (Calendar UI): WAITING_DEPENDENCY
 - P3-E (Regression & Closure): WAITING_DEPENDENCY
 
 ## Total Test Count
-273 tests PASS (Phase 1 + Phase 2 + P3-A + P3-B suite + DST remediation)
+304 tests PASS (Phase 1 + Phase 2 + P3-A + P3-B + P3-C suite)
 
 ## Quality Gates Status
-- `pytest -q`: PASS (273 passed in 127.90s)
+- `pytest -q`: PASS (304 passed in 148.25s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
 
-## Deliverables in P3-B
-- Added domain exceptions: `ServiceNotActiveError`, `StaffNotBookableError`, `StaffServiceAssignmentError`, `StaffNotAvailableError`, `AppointmentOverlapError`.
-- Staff capability verification: service `is_active`, staff `is_bookable`, and `StaffServiceAssignment` presence.
-- Timezone-aware weekly availability resolution matching local date/time to `StaffWeeklyAvailability` active slots.
-- Overlap detection predicate: `starts_at < existing.ends_at AND ends_at > existing.starts_at`.
-- Adjacency support: appointments sharing a boundary do not conflict.
-- Cancelled appointments do not block new bookings.
-- Race condition mitigation via PostgreSQL transaction-level advisory locks on staff profile.
-- DST-safe duration arithmetic: `starts_at` normalized to UTC before adding `timedelta`, guaranteeing `ends_at - starts_at == duration_snapshot` across DST transitions.
+## Deliverables in P3-C
+
+### Schemas (`apps/api/app/schemas/appointment.py`)
+- `AppointmentCreateRequest`: customer, service, staff, starts_at, timezone, notes (all validated).
+- `AppointmentUpdateRequest` (alias `AppointmentRescheduleRequest`): optional starts_at, timezone, notes for reschedule or notes-only updates.
+- `AppointmentResponse`: full appointment representation including snapshots, UTC instants, timezone, status, and timestamps.
+
+### Service Layer Additions (`apps/api/app/services/appointment.py`)
+- `get_appointment(db, appointment_id, salon_id)`: tenant-scoped retrieval (returns None for 404 boundary).
+- `list_appointments(db, salon_id, ...)`: filtering by date range, staff, customer, service, status; pagination with offset/limit; deterministic ordering.
+- `reschedule_appointment(db, appointment, starts_at, timezone_name, notes)`: rejects terminal states, re-validates capability/availability/conflict with self-exclusion.
+
+### Router & Endpoints (`apps/api/app/routers/appointment.py`)
+- `POST /salons/{salon_id}/appointments`: create with full validation (404/422/409 error mapping).
+- `GET /salons/{salon_id}/appointments`: list with filters (starts_at_gte, starts_at_lte, staff_profile_id, customer_id, service_id, status), pagination (offset, limit).
+- `GET /salons/{salon_id}/appointments/{appointment_id}`: detail retrieval (404 when not found or cross-tenant).
+- `PATCH /salons/{salon_id}/appointments/{appointment_id}`: reschedule (starts_at + timezone together) and/or update notes; rejects terminal appointments.
+- `POST /salons/{salon_id}/appointments/{appointment_id}/{action}`: status transitions (`/confirm`, `/complete`, `/cancel`, `/no-show`), idempotent-safe, rejects invalid terminal transitions.
+- DELETE not implemented (405 Method Not Allowed).
+
+### Tests (`apps/api/tests/test_appointment_p3c.py`)
+31 comprehensive API contract tests covering:
+- CRUD operations (create, list, get, reschedule).
+- Role authorization (Owner, Manager, Staff permitted).
+- Error handling (404 cross-tenant, 422 validation, 409 conflict).
+- Filters (date range, staff, customer, service, status).
+- Pagination (offset, limit).
+- Status transitions (confirm, complete, cancel, no-show) with idempotency and terminal state rejection.
+- Edge cases: adjacent bookings, cancelled slot reuse, self-reschedule, notes-only updates, hard delete prohibition, unauthenticated/non-member isolation.
 
 ## Explicitly Deferred to Later Checkpoints
-- P3-C: FastAPI routers, request/response schemas, filter params, pagination, and action endpoints (`/confirm`, `/complete`, `/cancel`, `/no-show`).
-- P3-D: Frontend calendar UI, booking creation/rescheduling dialogs, BFF integration.
-- P3-E: End-to-end full regression and final phase audit closure.
+- P3-D: Frontend calendar UI (day/week/list views), appointment creation/reschedule dialogs, customer/staff/service pickers, available-time slots UX, 404/409/422 error display via BFF.
+- P3-E: Full end-to-end regression (auth/session + Phase 2 + P3-A/B/C domain + frontend production build) and phase closure.
 
 ## Working Tree Status
 Clean on branch `feature/phase-3-booking-engine`.
