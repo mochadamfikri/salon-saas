@@ -24,6 +24,7 @@ from common import (
 )
 
 from progress import run_streamed
+from host_verifier import verify_backend_sha, summarize_for_model
 
 POLL = int(os.environ.get("AUDITOR_POLL_SECONDS", "30"))
 AUDITOR_BIN = os.environ.get("AUDITOR_BIN") or os.environ.get("CODEX_BIN", "codex")
@@ -152,7 +153,7 @@ def read_if(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
-def build_prompt(meta: dict[str, Any], worktree: Path) -> str:
+def build_prompt(meta: dict[str, Any], worktree: Path, host_evidence: str = '') -> str:
     phase = meta.get("phase") or 2
     source_report = ""
     if meta.get("report_source"):
@@ -179,6 +180,9 @@ def build_prompt(meta: dict[str, Any], worktree: Path) -> str:
 ===== IMPLEMENTATION COMPLETION REPORT (UNTRUSTED EVIDENCE) =====
 {source_report or '(not supplied)'}
 
+===== TRUSTED HOST VERIFIER =====
+{host_evidence or '(not run)'}
+
 AUDIT EXECUTION REQUIREMENTS:
 - The disposable audit worktree is: {worktree}
 - It is pinned to AUDITED_SHA {audited_sha}.
@@ -186,6 +190,7 @@ AUDIT EXECUTION REQUIREMENTS:
 - Do not rely on the completion report as proof.
 - Inspect actual implementation and tests for checkpoint {meta.get('checkpoint') or '(unknown)'}.
 - Run targeted tests plus broader regression/quality gates when feasible.
+- TRUSTED HOST VERIFIER is independent execution evidence pinned to AUDITED_SHA. If it reports PASS, do not BLOCK solely because the model sandbox cannot access backend secrets, spawn Black, or rerun the same gates.
 - Do NOT implement fixes. Do NOT commit/push/merge/deploy.
 - Temporary/cache files inside this disposable worktree are allowed.
 - If verification is prevented by environment/tooling, distinguish that from an implementation defect and use BLOCKED when evidence is insufficient.
@@ -326,7 +331,19 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
     worktree: Path | None = None
     try:
         worktree = audit_worktree(row["id"], repo, audited_sha)
-        prompt = build_prompt(meta, worktree)
+        host_evidence = ""
+        if source == "hermes":
+            update_worker(
+                "auditor",
+                current_stage="Trusted verification",
+                current_activity="Menjalankan pytest dan quality gates di host terisolasi",
+                progress_pct=35,
+                activity_updated_at=now_iso(),
+            )
+            verifier_result = verify_backend_sha(audited_sha)
+            host_evidence = summarize_for_model(verifier_result)
+            log("HOST VERIFY " + ("PASS" if verifier_result.get("ok") else "FAIL") + f" sha={audited_sha[:8]}")
+        prompt = build_prompt(meta, worktree, host_evidence)
         prompt_dir = ROOT / "runtime/prompts"
         prompt_dir.mkdir(parents=True, exist_ok=True)
         prompt_path = prompt_dir / f"{row['id']}.txt"
