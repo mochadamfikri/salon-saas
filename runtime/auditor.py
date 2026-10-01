@@ -25,6 +25,7 @@ from common import (
 
 from progress import run_streamed
 from host_verifier import verify_backend_sha, summarize_for_model
+from frontend_verifier import verify_frontend_sha, summarize_frontend
 
 POLL = int(os.environ.get("AUDITOR_POLL_SECONDS", "30"))
 AUDITOR_BIN = os.environ.get("AUDITOR_BIN") or os.environ.get("CODEX_BIN", "codex")
@@ -336,13 +337,24 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
             update_worker(
                 "auditor",
                 current_stage="Trusted verification",
-                current_activity="Menjalankan pytest dan quality gates di host terisolasi",
+                current_activity="Menjalankan pytest dan quality gates backend di host terisolasi",
                 progress_pct=35,
                 activity_updated_at=now_iso(),
             )
             verifier_result = verify_backend_sha(audited_sha)
             host_evidence = summarize_for_model(verifier_result)
             log("HOST VERIFY " + ("PASS" if verifier_result.get("ok") else "FAIL") + f" sha={audited_sha[:8]}")
+        elif source == "codex":
+            update_worker(
+                "auditor",
+                current_stage="Trusted verification",
+                current_activity="Menjalankan Vitest, TypeScript, ESLint, dan build frontend",
+                progress_pct=35,
+                activity_updated_at=now_iso(),
+            )
+            verifier_result = verify_frontend_sha(audited_sha)
+            host_evidence = summarize_frontend(verifier_result)
+            log("FRONTEND HOST VERIFY " + ("PASS" if verifier_result.get("ok") else "FAIL") + f" sha={audited_sha[:8]}")
         prompt = build_prompt(meta, worktree, host_evidence)
         prompt_dir = ROOT / "runtime/prompts"
         prompt_dir.mkdir(parents=True, exist_ok=True)
