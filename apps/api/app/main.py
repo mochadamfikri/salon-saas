@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI
 
 from app.core.config import get_settings
+from app.routers.appointment import router as appointment_router
 from app.routers.auth import router as auth_router
 from app.routers.availability import router as availability_router
 from app.routers.customer import router as customer_router
@@ -23,6 +24,7 @@ app = FastAPI(
     docs_url="/docs" if settings.app_env == "development" else None,
     redoc_url=None,
 )
+app.include_router(appointment_router)
 app.include_router(auth_router)
 app.include_router(availability_router)
 app.include_router(customer_router)

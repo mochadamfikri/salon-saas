@@ -369,6 +369,101 @@ def validate_appointment_conflict(
         raise AppointmentOverlapError("Staff profile already has an overlapping appointment")
 
 
+def get_appointment(
+    db: Session,
+    appointment_id: UUID,
+    salon_id: UUID,
+) -> Appointment | None:
+    """Return an appointment only when it belongs to the current salon."""
+    return (
+        db.query(Appointment)
+        .filter(Appointment.id == appointment_id, Appointment.salon_id == salon_id)
+        .first()
+    )
+
+
+def list_appointments(
+    db: Session,
+    salon_id: UUID,
+    *,
+    starts_at_gte: datetime | None = None,
+    starts_at_lte: datetime | None = None,
+    staff_profile_id: UUID | None = None,
+    customer_id: UUID | None = None,
+    service_id: UUID | None = None,
+    appointment_status: str | None = None,
+    offset: int = 0,
+    limit: int = 50,
+) -> list[Appointment]:
+    """List a tenant's appointments with approved filters and pagination."""
+    query = db.query(Appointment).filter(Appointment.salon_id == salon_id)
+    if starts_at_gte is not None:
+        query = query.filter(Appointment.starts_at >= starts_at_gte.astimezone(UTC))
+    if starts_at_lte is not None:
+        query = query.filter(Appointment.starts_at <= starts_at_lte.astimezone(UTC))
+    if staff_profile_id is not None:
+        query = query.filter(Appointment.staff_profile_id == staff_profile_id)
+    if customer_id is not None:
+        query = query.filter(Appointment.customer_id == customer_id)
+    if service_id is not None:
+        query = query.filter(Appointment.service_id == service_id)
+    if appointment_status is not None:
+        query = query.filter(Appointment.status == appointment_status)
+    return query.order_by(Appointment.starts_at, Appointment.id).offset(offset).limit(limit).all()
+
+
+def reschedule_appointment(
+    db: Session,
+    appointment: Appointment,
+    starts_at: datetime,
+    timezone_name: str,
+    notes: str | None = None,
+) -> Appointment:
+    """Reschedule a non-terminal appointment after validation and conflict checks."""
+    if appointment.status in TERMINAL_STATES:
+        raise TerminalStateError(f"Cannot reschedule terminal appointment '{appointment.status}'")
+    if starts_at.tzinfo is None:
+        raise ValueError("starts_at must be timezone-aware")
+
+    valid_tz = validate_iana_timezone(timezone_name)
+    _, service, staff_profile = validate_appointment_tenant_invariants(
+        db=db,
+        salon_id=appointment.salon_id,
+        customer_id=appointment.customer_id,
+        service_id=appointment.service_id,
+        staff_profile_id=appointment.staff_profile_id,
+    )
+    starts_at = starts_at.astimezone(UTC)
+    ends_at = starts_at + timedelta(minutes=appointment.duration_minutes_snapshot)
+
+    validate_appointment_capability(db=db, service=service, staff_profile=staff_profile)
+    validate_appointment_availability(
+        db=db,
+        staff_profile_id=appointment.staff_profile_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        timezone_name=valid_tz,
+    )
+    _acquire_staff_booking_lock(db=db, staff_profile_id=appointment.staff_profile_id)
+    validate_appointment_conflict(
+        db=db,
+        salon_id=appointment.salon_id,
+        staff_profile_id=appointment.staff_profile_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        exclude_appointment_id=appointment.id,
+    )
+
+    appointment.starts_at = starts_at
+    appointment.ends_at = ends_at
+    appointment.timezone = valid_tz
+    if notes is not None:
+        appointment.notes = notes  # type: ignore[assignment]
+    db.flush()
+    db.refresh(appointment)
+    return appointment
+
+
 def create_appointment(
     db: Session,
     salon_id: UUID,
