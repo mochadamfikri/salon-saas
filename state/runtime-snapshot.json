@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-01T08:43:37.066344+00:00",
+  "workers": [
+    {
+      "id": "auditor",
+      "role": "auditor",
+      "status": "WAITING",
+      "current_task_id": null,
+      "phase": 2,
+      "checkpoint": "P2-D",
+      "branch": "feature/phase-2-salon-operations",
+      "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
+      "last_heartbeat": "2026-10-01T08:43:36.259811+00:00",
+      "current_stage": "Idle",
+      "current_activity": "Menunggu audit task",
+      "progress_pct": 0,
+      "last_successful_checkpoint": null
+    },
+    {
+      "id": "codex",
+      "role": "frontend_engineer",
+      "status": "WAITING",
+      "current_task_id": null,
+      "phase": null,
+      "checkpoint": null,
+      "branch": "feature/phase-2-web-codex",
+      "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
+      "last_heartbeat": "2026-10-01T08:43:36.934831+00:00",
+      "current_stage": "Idle",
+      "current_activity": "Menunggu task",
+      "progress_pct": 0,
+      "last_successful_checkpoint": null
+    },
+    {
+      "id": "hermes",
+      "role": "backend_engineer",
+      "status": "WAITING",
+      "current_task_id": null,
+      "phase": 2,
+      "checkpoint": "P2-D",
+      "branch": "feature/phase-2-salon-operations",
+      "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
+      "last_heartbeat": "2026-10-01T08:43:36.923485+00:00",
+      "current_stage": "Idle",
+      "current_activity": "Menunggu task",
+      "progress_pct": 0,
+      "last_successful_checkpoint": "P2-D"
+    },
+    {
+      "id": "notifier",
+      "role": "notifier",
+      "status": "WAITING",
+      "current_task_id": null,
+      "phase": null,
+      "checkpoint": null,
+      "branch": null,
+      "head_sha": null,
+      "last_heartbeat": "2026-10-01T08:43:23.758623+00:00",
+      "current_stage": null,
+      "current_activity": null,
+      "progress_pct": 0,
+      "last_successful_checkpoint": null
+    }
+  ]
+}
