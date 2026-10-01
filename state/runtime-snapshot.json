@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T16:20:52.728168+00:00",
+  "generated_at": "2026-10-01T16:21:25.092111+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
-      "last_heartbeat": "2026-10-01T16:20:46.802292+00:00",
+      "last_heartbeat": "2026-10-01T16:21:16.811295+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu audit task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-C",
       "branch": null,
       "head_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
-      "last_heartbeat": "2026-10-01T16:20:52.546887+00:00",
+      "last_heartbeat": "2026-10-01T16:21:22.574987+00:00",
       "current_stage": "Menunggu kandidat",
       "current_activity": "Menunggu PASS_CANDIDATE yang eligible",
       "progress_pct": 0,
@@ -71,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T16:20:43.276119+00:00",
+      "last_heartbeat": "2026-10-01T16:21:13.312852+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
