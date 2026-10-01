@@ -48,3 +48,16 @@ Before `READY_FOR_AUDIT`:
 - working tree clean.
 
 Never self-declare auditor PASS.
+
+## Trusted Host Gate Handoff
+
+Codex runs inside a restricted sandbox. The control plane has a separate trusted host verifier which runs the complete frontend quality gates against the pushed SHA.
+
+For every frontend checkpoint:
+
+- Run every check that is feasible inside the Codex sandbox.
+- A sandbox-only inability to spawn Vitest workers or a Next/Turbopack process is an environment limitation.
+- If the implementation is complete, feasible checks are green, and only sandbox restrictions remain, document the limitation, commit, and push the checkpoint.
+- The trusted host verifier then runs full Vitest, TypeScript, ESLint, and production build against the immutable pushed SHA.
+- A real deterministic source, TypeScript, ESLint, or test failure must still be fixed before handoff.
+- Never mix later checkpoint work into the current checkpoint commit.
