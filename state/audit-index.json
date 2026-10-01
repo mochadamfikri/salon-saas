@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T22:55:36.172357+00:00",
+  "generated_at": "2026-10-01T22:56:08.331119+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -113,6 +113,20 @@
       "authoritative_sha": "d1b60a769359cc33868d1ed263c36116a7888ea9",
       "last_error": null,
       "result_path": "/home/ubuntu/salon-orchestrator/audit/hermes/AUDIT-P3-B-d1b60a76.md"
+    },
+    {
+      "id": "AUDIT-P3-C",
+      "target_agent": "auditor",
+      "phase": 3,
+      "checkpoint": "P3-C",
+      "state": "RUNNING",
+      "created_at": "2026-10-01T22:55:37.746711+00:00",
+      "started_at": "2026-10-01T22:56:06.258536+00:00",
+      "finished_at": null,
+      "attempts": 1,
+      "authoritative_sha": "627e6fa57ca19bc92854678e77a707976f962c7e",
+      "last_error": null,
+      "result_path": null
     }
   ]
 }
