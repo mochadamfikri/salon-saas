@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T11:27:19.732204+00:00",
+  "generated_at": "2026-10-01T11:27:25.655710+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "c21697776e6ce8752afe1168f47ed3a2f19c9b7a",
-      "last_heartbeat": "2026-10-01T11:27:18.008775+00:00",
-      "current_stage": "Blocked",
-      "current_activity": "Audit tidak dapat diselesaikan",
-      "progress_pct": 100,
+      "last_heartbeat": "2026-10-01T11:27:24.764154+00:00",
+      "current_stage": "Idle",
+      "current_activity": "Menunggu audit task",
+      "progress_pct": 0,
       "last_successful_checkpoint": "P2-E"
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "c21697776e6ce8752afe1168f47ed3a2f19c9b7a",
-      "last_heartbeat": "2026-10-01T11:26:52.009455+00:00",
+      "last_heartbeat": "2026-10-01T11:27:22.024441+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T11:27:05.780556+00:00",
+      "last_heartbeat": "2026-10-01T11:27:20.800143+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
