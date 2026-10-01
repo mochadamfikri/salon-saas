@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T18:18:32.253596+00:00",
+  "generated_at": "2026-10-01T18:19:04.475633+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -77,11 +77,11 @@
       "target_agent": "auditor",
       "phase": 2,
       "checkpoint": "PHASE2-CLOSURE",
-      "state": "QUEUED",
+      "state": "RUNNING",
       "created_at": "2026-10-01T17:40:57.559479+00:00",
       "started_at": "2026-10-01T17:41:19.967579+00:00",
       "finished_at": null,
-      "attempts": 1,
+      "attempts": 2,
       "authoritative_sha": "c08e42d09407f8493e64e4ad8b21ff43c01b6e6d",
       "last_error": null,
       "result_path": "/home/ubuntu/salon-orchestrator/audit/hermes/AUDIT-PHASE2-CLOSURE-c08e42d0.md"
