@@ -90,6 +90,7 @@ class Salon(TimestampMixin, Base):
     invitations: Mapped[list["SalonInvitation"]] = relationship(back_populates="salon")
     services: Mapped[list["SalonService"]] = relationship(back_populates="salon")
     customers: Mapped[list["SalonCustomer"]] = relationship(back_populates="salon")
+    appointments: Mapped[list["Appointment"]] = relationship(back_populates="salon")
 
 
 class SalonMembership(TimestampMixin, Base):
@@ -222,6 +223,7 @@ class SalonService(TimestampMixin, Base):
     staff_assignments: Mapped[list["StaffServiceAssignment"]] = relationship(
         back_populates="service"
     )
+    appointments: Mapped[list["Appointment"]] = relationship(back_populates="service")
 
 
 class StaffProfile(TimestampMixin, Base):
@@ -254,6 +256,7 @@ class StaffProfile(TimestampMixin, Base):
     weekly_availability: Mapped[list["StaffWeeklyAvailability"]] = relationship(
         back_populates="staff_profile"
     )
+    appointments: Mapped[list["Appointment"]] = relationship(back_populates="staff_profile")
 
 
 class StaffServiceAssignment(TimestampMixin, Base):
@@ -344,3 +347,88 @@ class SalonCustomer(TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(String(1000), nullable=True)
 
     salon: Mapped["Salon"] = relationship(back_populates="customers")
+    appointments: Mapped[list["Appointment"]] = relationship(back_populates="customer")
+
+
+# ============================================================================
+# Phase 3: Booking & Appointment Engine
+# ============================================================================
+
+
+class Appointment(TimestampMixin, Base):
+    """Tenant-scoped appointment linking customer, service, and staff.
+
+    Snapshots service metadata at booking time. Lifecycle: scheduled, confirmed,
+    completed, cancelled, no_show. Terminal states cannot be reopened in Phase 3.
+    Stores UTC instants with IANA timezone for local interpretation.
+    """
+
+    __tablename__ = "appointments"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')",
+            name="ck_appointments_status",
+        ),
+        CheckConstraint("ends_at > starts_at", name="ck_appointments_time_order"),
+        CheckConstraint(
+            "duration_minutes_snapshot > 0",
+            name="ck_appointments_duration_snapshot_positive",
+        ),
+        CheckConstraint(
+            "price_amount_snapshot >= 0",
+            name="ck_appointments_price_snapshot_non_negative",
+        ),
+        Index("ix_appointments_starts_at", "starts_at"),
+        Index("ix_appointments_salon_staff_starts_at", "salon_id", "staff_profile_id", "starts_at"),
+        Index("ix_appointments_salon_status_starts_at", "salon_id", "status", "starts_at"),
+        Index("ix_appointments_salon_customer_starts_at", "salon_id", "customer_id", "starts_at"),
+        Index("ix_appointments_salon_service_starts_at", "salon_id", "service_id", "starts_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    salon_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("salons.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("salon_customers.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    service_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("salon_services.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    staff_profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("staff_profiles.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+
+    # Time instants stored in UTC
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # IANA timezone for local interpretation (e.g., "Asia/Jakarta")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    # Service metadata snapshots
+    service_name_snapshot: Mapped[str] = mapped_column(String(200), nullable=False)
+    duration_minutes_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_amount_snapshot: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency_snapshot: Mapped[str] = mapped_column(String(3), nullable=False)
+
+    # Lifecycle state
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="scheduled")
+
+    # Optional booking notes
+    notes: Mapped[str] = mapped_column(String(1000), nullable=True)
+
+    # Relationships
+    salon: Mapped["Salon"] = relationship(back_populates="appointments")
+    customer: Mapped["SalonCustomer"] = relationship(back_populates="appointments")
+    service: Mapped["SalonService"] = relationship(back_populates="appointments")
+    staff_profile: Mapped["StaffProfile"] = relationship(back_populates="appointments")
