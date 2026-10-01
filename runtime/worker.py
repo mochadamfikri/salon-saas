@@ -91,7 +91,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
     attempts = row["attempts"] + 1
     con = db()
     con.execute(
-        "UPDATE tasks SET state='RUNNING',started_at=COALESCE(started_at,?),attempts=? WHERE id=?",
+        "UPDATE tasks SET state='RUNNING',started_at=COALESCE(started_at,?),attempts=?,last_error=NULL WHERE id=?",
         (now_iso(), attempts, row["id"]),
     )
     con.commit()
@@ -214,7 +214,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         err = f"delivery-check gagal: {delivery_reason}"
     else:
         err = f"exit={returncode}; {output[-1500:]}"
-    if attempts < MAX_ATTEMPTS:
+    if attempts < MAX_ATTEMPTS and returncode != 86:
         con.execute(
             "UPDATE tasks SET state='REVISE',last_error=? WHERE id=?",
             (err, row["id"]),
@@ -256,7 +256,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             "worker.blocked",
             "OWNER_ACTION_REQUIRED",
             f"{agent.title()} blocked",
-            f"{row['id']} failed after {attempts} fresh-session attempts. WIP was preserved.",
+            f"{row['id']} blocked: {err}. WIP was preserved.",
             phase=row["phase"],
             checkpoint=row["checkpoint"],
             task_id=row["id"],
