@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.routers.auth import router as auth_router
 from app.routers.availability import router as availability_router
+from app.routers.customer import router as customer_router
 from app.routers.invitation import router as invitation_router
 from app.routers.password_reset import router as password_reset_router
 from app.routers.service import router as service_router
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 app.include_router(auth_router)
 app.include_router(availability_router)
+app.include_router(customer_router)
 app.include_router(invitation_router)
 app.include_router(password_reset_router)
 app.include_router(service_router)
