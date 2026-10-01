@@ -1,7 +1,7 @@
 # Phase 3 P3-B Completion Report
 
 ## Status
-READY FOR AUDIT
+READY FOR AUDIT (revision `REV-P3-B-49d6bc29` applied; re-audit required)
 
 ## Scope
 P3-B — Availability Resolution & Conflict Engine only.
@@ -39,6 +39,8 @@ P3-B — Availability Resolution & Conflict Engine only.
 - Updated `create_appointment`:
   - Validates timezone awareness and IANA timezone name.
   - Validates tenant boundaries.
+  - Normalizes `starts_at` to UTC before duration arithmetic to preserve exact duration across DST transitions (`REV-P3-B-49d6bc29`).
+  - Computes `ends_at = starts_at + timedelta(minutes=duration)` in UTC, guaranteeing invariant `ends_at - starts_at == duration_snapshot`.
   - Validates capability (service active, staff bookable, assignment exists).
   - Validates weekly availability in local timezone.
   - Acquires staff advisory transaction lock.
@@ -46,12 +48,20 @@ P3-B — Availability Resolution & Conflict Engine only.
   - Snapshots duration, service name, price amount, and currency.
   - Persists appointment with `scheduled` status.
 
+### Audit Remediation (REV-P3-B-49d6bc29)
+- Defect: Wall-time arithmetic on aware datetimes with DST transitions produced elapsed intervals different from duration snapshot.
+- Fix: Normalizes `starts_at` to UTC before adding `timedelta(minutes=duration)`.
+- Added tests:
+  - `test_appointment_duration_preserved_across_spring_forward_dst`: verifies 60-minute appointment across spring-forward DST has exact 3600-second elapsed UTC interval.
+  - `test_appointment_duration_preserved_across_fall_back_dst`: verifies 60-minute appointment across fall-back DST has exact 3600-second elapsed UTC interval.
+  - `test_adjacent_appointments_across_dst_transition`: verifies adjacent appointments across DST boundaries do not conflict.
+
 ## Verification Evidence
 
 ### Test Suite Execution
-- `pytest -q`: PASS (270 passed, 25 known non-blocking warnings in 124.37s)
+- `pytest -q`: PASS (273 passed, 25 known non-blocking warnings in 127.90s)
   - 25 tests in `test_appointment_p3a.py`
-  - 24 tests in `test_appointment_p3b.py`
+  - 27 tests in `test_appointment_p3b.py` (24 initial + 3 DST remediation tests)
   - 221 regression tests across Phase 1, Phase 2, and auth/tenancy suites
 
 ### Quality Gates
@@ -61,6 +71,8 @@ P3-B — Availability Resolution & Conflict Engine only.
 
 ## Commits
 - Implementation SHA: `0ccbb5b`
+- Documentation & Handoff SHA: `49d6bc2`
+- Revision Remediation SHA: `c69c4c6`
 - Branch: `feature/phase-3-booking-engine`
 - Remote: `origin/feature/phase-3-booking-engine`
 
