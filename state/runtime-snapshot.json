@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T08:53:20.301930+00:00",
+  "generated_at": "2026-10-01T08:53:36.334741+00:00",
   "workers": [
     {
       "id": "auditor",
       "role": "auditor",
-      "status": "WAITING",
-      "current_task_id": null,
+      "status": "AUDITING",
+      "current_task_id": "AUDIT-P2-D-d797720",
       "phase": 2,
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T08:53:12.542036+00:00",
-      "current_stage": "Blocked",
-      "current_activity": "Audit tidak dapat diselesaikan",
-      "progress_pct": 100,
+      "last_heartbeat": "2026-10-01T08:53:35.522257+00:00",
+      "current_stage": "Preparing audit",
+      "current_activity": "Menyiapkan worktree audit",
+      "progress_pct": 10,
       "last_successful_checkpoint": null
     },
     {
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T08:53:09.116228+00:00",
+      "last_heartbeat": "2026-10-01T08:53:24.124779+00:00",
       "current_stage": null,
       "current_activity": null,
       "progress_pct": 0,
