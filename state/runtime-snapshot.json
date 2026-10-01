@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T14:17:19.541825+00:00",
+  "generated_at": "2026-10-01T14:17:36.336725+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -33,6 +33,21 @@
       "last_successful_checkpoint": "P2-E"
     },
     {
+      "id": "final-reviewer",
+      "role": "final_reviewer",
+      "status": "BLOCKED",
+      "current_task_id": "AUDIT-FE-P2-C",
+      "phase": 2,
+      "checkpoint": "P2-C",
+      "branch": null,
+      "head_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
+      "last_heartbeat": "2026-10-01T14:17:35.432085+00:00",
+      "current_stage": "Butuh review Owner",
+      "current_activity": "File audit task tidak ditemukan.",
+      "progress_pct": 100,
+      "last_successful_checkpoint": null
+    },
+    {
       "id": "hermes",
       "role": "backend_engineer",
       "status": "WAITING",
@@ -56,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T14:17:07.742777+00:00",
+      "last_heartbeat": "2026-10-01T14:17:22.760609+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
