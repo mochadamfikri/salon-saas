@@ -11,6 +11,7 @@ import type {
   BackendInvitationAcceptResponse,
   BackendLoginRequest,
   BackendMySalon,
+  BackendMembership,
   BackendRefreshRequest,
   BackendRegisterRequest,
   BackendSalon,
@@ -18,6 +19,9 @@ import type {
   BackendSalonService,
   BackendSalonServiceCreateRequest,
   BackendSalonServiceUpdateRequest,
+  BackendStaffProfile,
+  BackendStaffProfileUpdateRequest,
+  BackendStaffAssignment,
   BackendTokenPair,
   BackendUser,
 } from "./contracts";
@@ -38,6 +42,7 @@ export type BackendErrorCode =
   | "invitation_email_mismatch"
   | "invitation_unavailable"
   | "validation_error"
+  | "conflict"
   | "unauthorized"
   | "forbidden"
   | "not_found"
@@ -92,7 +97,7 @@ export function mapBackendError(status: number, detail: string): BackendErrorCod
     if (d.includes("already") && d.includes("accept")) return "invitation_already_accepted";
     if (d.includes("already") && d.includes("membership"))
       return "invitation_duplicate_membership";
-    return "unknown_error";
+    return "conflict";
   }
   if (status === 410) {
     if (d.includes("expir")) return "invitation_expired";
@@ -262,6 +267,31 @@ export class BackendClient {
       method: "POST",
       accessToken,
     });
+  }
+
+  listMembers(accessToken: string, salonId: string): Promise<BackendResult<BackendMembership[]>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/members`, { method: "GET", accessToken });
+  }
+  listStaffProfiles(accessToken: string, salonId: string): Promise<BackendResult<BackendStaffProfile[]>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles`, { method: "GET", accessToken });
+  }
+  createStaffProfile(accessToken: string, salonId: string, membership_id: string): Promise<BackendResult<BackendStaffProfile>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles`, { method: "POST", body: { membership_id }, accessToken });
+  }
+  updateStaffProfile(accessToken: string, salonId: string, id: string, body: BackendStaffProfileUpdateRequest): Promise<BackendResult<BackendStaffProfile>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}`, { method: "PATCH", body, accessToken });
+  }
+  toggleStaffBookable(accessToken: string, salonId: string, id: string, is_bookable: boolean): Promise<BackendResult<BackendStaffProfile>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}/toggle-bookable`, { method: "POST", body: { is_bookable }, accessToken });
+  }
+  listStaffAssignments(accessToken: string, salonId: string, id: string): Promise<BackendResult<BackendStaffAssignment[]>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}/services`, { method: "GET", accessToken });
+  }
+  assignStaffService(accessToken: string, salonId: string, id: string, serviceId: string): Promise<BackendResult<BackendStaffAssignment>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}/services/${encodeURIComponent(serviceId)}`, { method: "POST", accessToken });
+  }
+  unassignStaffService(accessToken: string, salonId: string, id: string, serviceId: string): Promise<BackendResult<null>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}/services/${encodeURIComponent(serviceId)}`, { method: "DELETE", accessToken });
   }
 
   /**

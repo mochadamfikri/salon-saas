@@ -34,6 +34,7 @@ const MESSAGES: Record<BackendErrorCode, string> = {
   rate_limited: "Too many attempts. Please wait a moment and try again.",
   network_error: "Could not reach the server. Check your connection and try again.",
   unknown_error: "Something went wrong. Please try again.",
+  conflict: "This change conflicts with existing data.",
 };
 
 /** UI message for a backend error code. Always returns a safe string. */

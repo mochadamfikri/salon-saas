@@ -115,6 +115,15 @@ export interface BackendSalonServiceUpdateRequest {
   currency?: string;
 }
 
+export interface BackendStaffProfile {
+  id: string; membership_id: string; display_name: string | null; phone: string | null;
+  bio: string | null; photo_url: string | null; is_bookable: boolean; created_at: string; updated_at: string;
+}
+export interface BackendStaffProfileUpdateRequest {
+  display_name?: string | null; phone?: string | null; bio?: string | null; photo_url?: string | null;
+}
+export interface BackendStaffAssignment { id: string; staff_profile_id: string; salon_service_id: string; created_at: string; updated_at: string }
+
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
  * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).

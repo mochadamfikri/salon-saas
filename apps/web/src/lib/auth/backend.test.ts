@@ -170,3 +170,26 @@ describe("BackendClient", () => {
     expect(seen[0].body).toEqual({ name: "Glow", slug: "glow" });
   });
 });
+
+describe("P2-C staff profile client", () => {
+  it("uses the approved profile and assignment paths and preserves status semantics", async () => {
+    const requests: Array<{ url: string; method: string; body?: string }> = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      requests.push({ url, method: init.method ?? "GET", body: init.body as string | undefined });
+      return new Response(JSON.stringify({ id: "profile-1" }), { status: 201 });
+    }) as unknown as typeof fetch;
+    const client = new BackendClient({ baseUrl: "https://api.test", fetchImpl });
+    await client.createStaffProfile("token", "salon/1", "member-1");
+    await client.updateStaffProfile("token", "salon/1", "profile-1", { bio: null });
+    await client.assignStaffService("token", "salon/1", "profile-1", "service-1");
+    await client.unassignStaffService("token", "salon/1", "profile-1", "service-1");
+    expect(requests.map(({ url, method }) => [url, method])).toEqual([
+      ["https://api.test/salons/salon%2F1/staff-profiles", "POST"],
+      ["https://api.test/salons/salon%2F1/staff-profiles/profile-1", "PATCH"],
+      ["https://api.test/salons/salon%2F1/staff-profiles/profile-1/services/service-1", "POST"],
+      ["https://api.test/salons/salon%2F1/staff-profiles/profile-1/services/service-1", "DELETE"],
+    ]);
+    expect(requests[0]?.body).toBe(JSON.stringify({ membership_id: "member-1" }));
+    expect(requests[1]?.body).toBe(JSON.stringify({ bio: null }));
+  });
+});

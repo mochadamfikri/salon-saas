@@ -232,8 +232,9 @@ export function bffErrorResponse(
           ? 404
           : code === "invitation_expired" || code === "invitation_revoked"
             ? 410
-            : code === "invitation_already_accepted" ||
-                code === "invitation_duplicate_membership"
+              : code === "invitation_already_accepted" ||
+                code === "invitation_duplicate_membership" ||
+                code === "conflict"
               ? 409
               : code === "email_taken" || code === "slug_taken"
                 ? 400
