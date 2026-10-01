@@ -96,7 +96,7 @@ def query_one(sql: str, args=()):
 def login_page() -> str:
     return """<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>
     <style>body{font-family:system-ui;background:#0b0d10;color:#eee;display:grid;place-items:center;height:100vh;margin:0}form{background:#171a20;padding:28px;border-radius:18px;width:min(360px,85vw)}input,button{width:100%;padding:12px;margin:7px 0;border-radius:10px;border:1px solid #333;background:#0f1115;color:#fff;box-sizing:border-box}button{background:#fff;color:#111;font-weight:700}</style>
-    <form method=post><h2>Salon SaaS Ops</h2><input name=username placeholder=User autocomplete=username><input type=password name=password placeholder=Password autocomplete=current-password><button>Login</button></form>"""
+    <form method=post><h2>IDSE NETWORK DEVELOPING PANEL</h2><input name=username placeholder=User autocomplete=username><input type=password name=password placeholder=Password autocomplete=current-password><button>Login</button></form>"""
 
 
 @app.post("/login")
@@ -430,11 +430,38 @@ def phase_activate(request: Request, upload_id: str):
 
 
 DASHBOARD = r"""<!doctype html>
-<html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Salon SaaS Ops</title>
+<html><head><meta name=viewport content="width=device-width,initial-scale=1"><title>Developing Panel</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0a0c10;color:#f4f4f5;font-family:system-ui,-apple-system,sans-serif}.top{position:sticky;top:0;background:#11141aee;backdrop-filter:blur(12px);padding:14px 18px;border-bottom:1px solid #242833;display:flex;justify-content:space-between;z-index:5}.wrap{max-width:1100px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.card{background:#141821;border:1px solid #262c38;border-radius:16px;padding:16px}.pill{display:inline-block;padding:4px 9px;border-radius:99px;background:#252b37;font-size:12px}.good{background:#143322}.bad{background:#3a1717}.warn{background:#3a3012}button,input{border:1px solid #303746;background:#181d26;color:#fff;border-radius:10px;padding:9px 12px}button{cursor:pointer}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:10px;border-bottom:1px solid #272d38;text-align:left}.section{margin-top:24px}.muted{color:#9ca3af;font-size:13px}.hidden{display:none}@media(max-width:640px){.wrap{padding:12px}td:nth-child(n+4),th:nth-child(n+4){display:none}}
+</style><style>
+/* IDSE_PANEL_V1 */
+:root{--bg:#070a10;--card:#121722;--line:#273041;--accent:#7c8cff;--cyan:#4fd8ff;--muted:#94a3b8;--ok:#36d98b;--warn:#f4c451;--bad:#ff6475}
+body{background:radial-gradient(circle at 15% -5%,rgba(124,140,255,.16),transparent 32%),radial-gradient(circle at 90% 8%,rgba(79,216,255,.10),transparent 28%),var(--bg);background-attachment:fixed}
+.top{min-height:76px;background:rgba(8,11,17,.88);border-bottom:1px solid rgba(148,163,184,.15);box-shadow:0 12px 36px rgba(0,0,0,.22)}
+.top>b{display:flex;align-items:center;gap:10px;letter-spacing:.025em}
+.top>b:before{content:"ID";width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--cyan));font-size:12px;box-shadow:0 0 24px rgba(124,140,255,.3)}
+.wrap>div:first-child{display:flex;gap:7px;flex-wrap:wrap;padding:6px;border:1px solid rgba(148,163,184,.13);border-radius:14px;background:rgba(16,21,30,.62);backdrop-filter:blur(12px);width:max-content;max-width:100%}
+.wrap>div:first-child button{background:transparent;border-color:transparent;font-weight:650;transition:.18s ease}
+.wrap>div:first-child button:hover{background:rgba(124,140,255,.14);border-color:rgba(124,140,255,.25);transform:translateY(-1px)}
+.card{background:linear-gradient(145deg,rgba(22,28,40,.92),rgba(13,17,25,.9));border-color:rgba(148,163,184,.16);border-radius:20px;box-shadow:0 16px 45px rgba(0,0,0,.16);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.card:hover{transform:translateY(-2px);border-color:rgba(124,140,255,.32);box-shadow:0 20px 55px rgba(0,0,0,.24)}
+.pill{position:relative;padding-left:21px;font-weight:700}
+.pill:before{content:"";position:absolute;left:8px;top:50%;width:7px;height:7px;border-radius:50%;transform:translateY(-50%);background:#8993a4}
+.pill.good{background:rgba(29,112,69,.30);color:#c2f8dc}.pill.good:before{background:var(--ok);box-shadow:0 0 9px rgba(54,217,139,.75);animation:pulse 2s infinite}
+.pill.warn{background:rgba(126,95,20,.28);color:#ffe2a0}.pill.warn:before{background:var(--warn)}
+.pill.bad{background:rgba(139,35,51,.28);color:#ffc1c8}.pill.bad:before{background:var(--bad)}
+button{transition:transform .15s ease,background .15s ease,border-color .15s ease}button:active{transform:scale(.97)}
+.section:not(.hidden){animation:fadeUp .23s ease both}
+h2{letter-spacing:-.035em}
+.muted{color:var(--muted)}
+tbody tr{transition:background .18s ease}tbody tr:hover{background:rgba(124,140,255,.05)}
+#notifs .card{border-left:3px solid rgba(124,140,255,.55)}
+@keyframes pulse{50%{opacity:.55;transform:translateY(-50%) scale(.82)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:640px){.top>b{font-size:12px}.top>b:before{width:34px;height:34px}.wrap>div:first-child{width:100%;overflow-x:auto;flex-wrap:nowrap}.wrap>div:first-child button{flex:0 0 auto}}
+
 </style></head><body>
-<div class=top><b>Salon SaaS Ops</b><div><button onclick="showTab('notifications')">🔔 <span id=unread>0</span></button> <form style=display:inline method=post action=/logout><button>Keluar</button></form></div></div>
+<div class=top><b>IDSE NETWORK DEVELOPING PANEL</b><div><button onclick="showTab('notifications')">🔔 <span id=unread>0</span></button> <form style=display:inline method=post action=/logout><button>Keluar</button></form></div></div>
 <div class=wrap><div><button onclick="showTab('dashboard')">Dashboard</button> <button onclick="showTab('tasks')">Tasks</button> <button onclick="showTab('reports')">Reports</button> <button onclick="showTab('phases')">Phases</button> <button onclick="showTab('notifications')">Notif</button></div>
 <section id=dashboard class=section><h2>Workers</h2><div id=workers class=grid></div><h2>Project</h2><div id=project class=card></div></section>
 <section id=tasks class="section hidden"><h2>Queue / Tasks</h2><div class=card><table><thead><tr><th>ID</th><th>Agent</th><th>Status</th><th>Checkpoint</th><th>Attempts</th></tr></thead><tbody id=taskrows></tbody></table></div></section>
@@ -464,7 +491,7 @@ function fmtWIB(v){
 }
 
 function showTab(id){document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
-async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,60).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,60).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
 async function act(w,a){try{await api(`/api/workers/${w}/${a}`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 async function readAll(){await api('/api/notifications/read-all',{method:'POST'});refresh()}
 async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`Validated Phase ${x.phase}: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}
