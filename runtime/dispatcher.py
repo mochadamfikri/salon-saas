@@ -102,11 +102,40 @@ def backend_ready(item: dict[str, Any]) -> bool:
     return bool(row and row["state"] == "FINAL_PASS")
 
 
-def previous_impl_ready(index: int) -> bool:
+def previous_frontend_final(index: int) -> bool:
+    # Frontend checkpoint berikutnya hanya boleh terbuka setelah audit frontend sebelumnya FINAL_PASS.
     if index == 0:
         return True
-    prev = get_task(CHECKPOINTS[index - 1]["frontend_task"])
-    return bool(prev and prev["state"] in ("READY_FOR_AUDIT", "COMPLETED", "FINAL_PASS"))
+    prev_audit = get_task(CHECKPOINTS[index - 1]["frontend_audit"])
+    return bool(prev_audit and prev_audit["state"] == "FINAL_PASS")
+
+
+def set_task_state(task_id: str, state: str) -> None:
+    con = db()
+    con.execute("UPDATE tasks SET state=? WHERE id=?", (state, task_id))
+    con.commit()
+    con.close()
+
+
+def enforce_frontend_dependencies() -> None:
+    # Tahan task yang belum eligible. Task RUNNING tidak dibunuh agar WIP tetap aman.
+    for index, item in enumerate(CHECKPOINTS):
+        if index == 0:
+            continue
+        eligible = backend_ready(item) and previous_frontend_final(index)
+        impl = get_task(item["frontend_task"])
+        audit = get_task(item["frontend_audit"])
+
+        if not eligible:
+            if impl and impl["state"] == "QUEUED":
+                set_task_state(item["frontend_task"], "WAITING_DEPENDENCY")
+            if audit and audit["state"] == "QUEUED":
+                set_task_state(item["frontend_audit"], "WAITING_DEPENDENCY")
+        else:
+            if impl and impl["state"] == "WAITING_DEPENDENCY":
+                set_task_state(item["frontend_task"], "QUEUED")
+            if audit and audit["state"] == "WAITING_DEPENDENCY":
+                set_task_state(item["frontend_audit"], "QUEUED")
 
 
 def parse_base_sha(path: str | None) -> str | None:
@@ -301,13 +330,24 @@ def dispatch_once() -> None:
     ensure_schema()
     close_ready_sources()
 
+    enforce_frontend_dependencies()
+
     for index, item in enumerate(CHECKPOINTS):
-        if backend_ready(item) and previous_impl_ready(index) and not get_task(item["frontend_task"]):
+        eligible = backend_ready(item) and previous_frontend_final(index)
+
+        if eligible and not get_task(item["frontend_task"]):
             create_frontend_task(item)
 
         impl = get_task(item["frontend_task"])
-        if impl and impl["state"] == "READY_FOR_AUDIT" and not get_task(item["frontend_audit"]):
+        if (
+            eligible
+            and impl
+            and impl["state"] == "READY_FOR_AUDIT"
+            and not get_task(item["frontend_audit"])
+        ):
             create_frontend_audit(item, impl)
+
+    enforce_frontend_dependencies()
 
     close_ready_sources()
     sync_states()

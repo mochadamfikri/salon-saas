@@ -94,6 +94,200 @@ def query_one(sql: str, args=()):
     return dict(row) if row else None
 
 
+STATUS_ID = {
+    "QUEUED": ("🕒", "Antrean", "Menunggu giliran worker."),
+    "RUNNING": ("🔵", "Sedang dikerjakan", "Worker sedang mengerjakan task."),
+    "READY_FOR_AUDIT": ("🟣", "Siap diaudit", "Implementasi selesai dan menunggu pemeriksaan auditor."),
+    "WAITING_DEPENDENCY": ("🔒", "Menunggu dependensi", "Belum boleh berjalan karena checkpoint sebelumnya belum Lulus Final."),
+    "PASS_CANDIDATE": ("🟡", "Kandidat lulus", "Auto Auditor lulus; masih menunggu final review."),
+    "FINAL_PASS": ("✅", "Lulus final", "Checkpoint telah disetujui final dan dependensi berikutnya boleh terbuka."),
+    "REVISE_REQUIRED": ("🔁", "Perlu revisi", "Auditor menemukan masalah; task perbaikan harus dikerjakan dan diaudit ulang."),
+    "REVISE": ("🔁", "Sedang revisi", "Task dikembalikan ke engineer untuk diperbaiki."),
+    "COMPLETED": ("✅", "Selesai", "Task implementasi/revisi selesai dan checkpoint terkait telah lulus."),
+    "BLOCKED": ("⛔", "Terblokir", "Tidak dapat dilanjutkan sampai penyebab blokir diselesaikan."),
+    "ERROR": ("🚨", "Error", "Terjadi kegagalan operasional yang perlu diperiksa."),
+    "WAITING": ("⏸️", "Menunggu", "Worker hidup tetapi belum memiliki task yang eligible."),
+    "AUDITING": ("🔍", "Sedang audit", "Auditor sedang memeriksa source, test, dan evidence."),
+    "WAITING_REVISION": ("🔁", "Menunggu revisi", "Auditor menunggu hasil perbaikan engineer."),
+    "PAUSED": ("⏸️", "Dijeda", "Worker dihentikan sementara oleh Owner."),
+    "OFFLINE": ("⚫", "Offline", "Service worker tidak aktif."),
+    "RECOVERING": ("🛠️", "Pemulihan", "Worker mencoba pulih dan mengulang task secara otomatis."),
+    "CANCELLED": ("🚫", "Dibatalkan", "Task dibatalkan sebelum mulai."),
+    "PENDING": ("⚪", "Belum dimulai", "Checkpoint belum dibuka."),
+    "ACTIVE": ("🚀", "Aktif", "Phase sedang aktif."),
+    "VALIDATED": ("📦", "Tervalidasi", "Phase sudah valid dan menunggu dependency/approval."),
+}
+
+
+def status_id(state: str | None) -> dict:
+    raw = str(state or "PENDING")
+    icon, label, detail = STATUS_ID.get(raw, ("ℹ️", raw, "Status sistem."))
+    return {"raw": raw, "icon": icon, "label": label, "detail": detail}
+
+
+def _phase2_checkpoint_stats():
+    try:
+        rows = query_all(
+            "SELECT checkpoint,backend_state,frontend_state,frontend_task_id,frontend_audit_task_id "
+            "FROM workflow_checkpoints WHERE phase=2 ORDER BY checkpoint"
+        )
+    except Exception:
+        rows = []
+
+    by_cp = {r["checkpoint"]: r for r in rows}
+    backend = [
+        {"checkpoint": "P2-A", "state": "FINAL_PASS"},
+        {"checkpoint": "P2-B", "state": "FINAL_PASS"},
+        {"checkpoint": "P2-C", "state": (by_cp.get("P2-C") or {}).get("backend_state", "FINAL_PASS")},
+        {"checkpoint": "P2-D", "state": (by_cp.get("P2-D") or {}).get("backend_state", "PENDING")},
+        {"checkpoint": "P2-E", "state": (by_cp.get("P2-E") or {}).get("backend_state", "PENDING")},
+    ]
+    frontend = [
+        {"checkpoint": "P2-B", "state": "FINAL_PASS"},
+        {"checkpoint": "P2-C", "state": (by_cp.get("P2-C") or {}).get("frontend_state", "PENDING")},
+        {"checkpoint": "P2-D", "state": (by_cp.get("P2-D") or {}).get("frontend_state", "PENDING")},
+        {"checkpoint": "P2-E", "state": (by_cp.get("P2-E") or {}).get("frontend_state", "PENDING")},
+    ]
+    for item in backend + frontend:
+        item["status"] = status_id(item["state"])
+    return backend, frontend
+
+
+def _pct(items):
+    if not items:
+        return 0
+    return round(sum(1 for x in items if x["state"] == "FINAL_PASS") * 100 / len(items))
+
+
+def _worker_reason(row: dict) -> str:
+    status = row.get("status")
+    wid = row.get("id")
+    activity = row.get("current_activity")
+    if status in ("RUNNING", "AUDITING", "RECOVERING", "ERROR", "BLOCKED") and activity:
+        return str(activity)
+    if wid == "notifier":
+        if status == "WAITING":
+            return "Telegram belum dikonfigurasi; notifier menunggu token bot dan chat ID."
+        if status == "RUNNING":
+            return activity or "Notifier Telegram aktif dan menunggu event penting."
+    if status == "WAITING":
+        if wid == "hermes":
+            return "Tidak ada task backend yang eligible; menunggu dependency atau phase berikutnya."
+        if wid == "codex":
+            return "Tidak ada task frontend yang eligible; menunggu backend dan frontend sebelumnya Lulus Final."
+        if wid == "auditor":
+            return "Tidak ada task audit yang siap diperiksa."
+    return activity or "Status worker aktif."
+
+
+@app.get("/api/project/stats")
+def project_stats(request: Request):
+    require(request)
+    config = yaml.safe_load((ROOT / "phase.yaml").read_text()) or {}
+    current_phase = int(config.get("current_phase", 2))
+    backend, frontend = _phase2_checkpoint_stats()
+
+    audit_rows = query_all(
+        "SELECT state,COUNT(*) AS total FROM tasks WHERE target_agent='auditor' GROUP BY state ORDER BY state"
+    )
+    audit_counts = {r["state"]: r["total"] for r in audit_rows}
+
+    workers = []
+    for row in query_all("SELECT * FROM workers ORDER BY id"):
+        row["status_display"] = status_id(row.get("status"))
+        row["reason"] = _worker_reason(row)
+        workers.append(row)
+
+    uploads = query_all(
+        "SELECT id,phase,status,master_spec_name,created_at,activated_at FROM phase_uploads ORDER BY phase,created_at"
+    )
+    phase_pipeline = [
+        {"phase": 1, "state": "FINAL_PASS", "label": "Selesai"},
+        {"phase": 2, "state": "ACTIVE" if current_phase == 2 else "FINAL_PASS", "label": "Aktif" if current_phase == 2 else "Selesai"},
+    ]
+    seen = {1, 2}
+    for u in uploads:
+        ph = int(u["phase"])
+        if ph in seen:
+            continue
+        seen.add(ph)
+        raw = u["status"]
+        state = "WAITING_DEPENDENCY" if raw == "VALIDATED" and ph > current_phase else raw
+        phase_pipeline.append({"phase": ph, "state": state, "label": status_id(state)["label"]})
+    phase_pipeline.sort(key=lambda x: x["phase"])
+
+    bp = _pct(backend)
+    fp = _pct(frontend)
+    overall = round((bp + fp) / 2)
+    next_frontend = next((x for x in frontend if x["state"] != "FINAL_PASS"), None)
+    next_action = (
+        f"Frontend {next_frontend['checkpoint']}: {next_frontend['status']['label']}"
+        if next_frontend
+        else "Semua checkpoint frontend Phase 2 Lulus Final; lanjut integration closure."
+    )
+
+    return {
+        "current_phase": current_phase,
+        "phase_status": config.get("phase_status", "active"),
+        "overall_percent": overall,
+        "backend_percent": bp,
+        "frontend_percent": fp,
+        "backend": backend,
+        "frontend": frontend,
+        "audit_counts": audit_counts,
+        "workers": workers,
+        "phase_pipeline": phase_pipeline,
+        "next_action": next_action,
+        "status_legend": [
+            {"state": k, **status_id(k)}
+            for k in (
+                "QUEUED","RUNNING","READY_FOR_AUDIT","WAITING_DEPENDENCY",
+                "PASS_CANDIDATE","FINAL_PASS","REVISE_REQUIRED","REVISE",
+                "COMPLETED","BLOCKED","ERROR","PAUSED","CANCELLED"
+            )
+        ],
+    }
+
+
+@app.get("/api/telegram-status")
+def telegram_status(request: Request):
+    require(request)
+    notifier = query_one("SELECT * FROM workers WHERE id='notifier'") or {}
+    pending = query_one(
+        "SELECT COUNT(*) AS total FROM events WHERE telegram_sent_at IS NULL "
+        "AND severity IN ('SUCCESS','WARNING','CRITICAL','OWNER_ACTION_REQUIRED')"
+    ) or {"total": 0}
+    configured = notifier.get("status") not in (None, "OFFLINE", "WAITING")
+    return {
+        "configured": configured,
+        "status": notifier.get("status", "OFFLINE"),
+        "status_display": status_id(notifier.get("status", "OFFLINE")),
+        "pending_important_events": int(pending["total"]),
+        "last_log": notifier.get("last_log"),
+        "heartbeat": notifier.get("last_heartbeat"),
+    }
+
+
+@app.post("/api/telegram-test")
+def telegram_test(request: Request):
+    require_csrf(request)
+    notifier = query_one("SELECT * FROM workers WHERE id='notifier'") or {}
+    if notifier.get("status") in (None, "OFFLINE", "WAITING"):
+        raise HTTPException(
+            409,
+            "Telegram notifier belum dikonfigurasi. Isi TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID pada environment service.",
+        )
+    emit(
+        "orchestrator",
+        "telegram.test",
+        "SUCCESS",
+        "Tes notifikasi Telegram",
+        "Notifikasi test dari IDSE Network Developing Panel.",
+        phase=int((yaml.safe_load((ROOT / "phase.yaml").read_text()) or {}).get("current_phase", 2)),
+    )
+    return {"ok": True, "message": "Event tes dibuat. Notifier akan mengirimkannya otomatis."}
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page() -> str:
     return """<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>
@@ -849,6 +1043,18 @@ body{
 .report-body{white-space:pre-wrap;word-break:break-word;background:#090d13;border:1px solid #222b39;border-radius:12px;padding:13px;max-height:42vh;overflow:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
 @media(max-width:640px){.modal-layer{padding:8px}.modal-box{max-height:92vh;padding:17px}.detail-grid{grid-template-columns:1fr}}
 
+
+/* IDSE_PANEL_V8_PROJECT_OVERVIEW */
+.stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.stat-card{background:#111722;border:1px solid #273041;border-radius:16px;padding:14px}
+.stat-card .big{font-size:25px;font-weight:800;letter-spacing:-.04em}
+.stat-card .small{font-size:12px;color:#94a3b8;margin-top:4px}
+.project-main{margin-bottom:12px}.bar{height:9px;background:#202837;border-radius:99px;overflow:hidden;margin-top:8px}.bar>span{display:block;height:100%;background:#6675e8;border-radius:99px}
+.progress-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}.checkpoint-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}.checkpoint-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid #242c39;padding-top:8px}.status-text{font-size:12px;font-weight:700;text-align:right}
+.phase-pipeline{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px}.phase-chip{flex:0 0 auto;background:#111722;border:1px solid #273041;border-radius:14px;padding:10px 12px;min-width:122px}
+.worker-reason{margin-top:9px;padding-top:8px;border-top:1px solid #242c39;color:#b1bccb;font-size:12px;line-height:1.45}
+.filter-card{margin-bottom:10px}.filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.filter-grid label{font-size:11px;color:#94a3b8;display:flex;flex-direction:column;gap:6px}.filter-grid select{width:100%;background:#0d121a;color:#fff;border:1px solid #303746;border-radius:10px;padding:10px}.status-legend td:first-child{white-space:nowrap;font-weight:700}.task-empty{padding:14px 0;text-align:center}.mini-note{font-size:12px;color:#94a3b8;line-height:1.5;margin-top:6px}
+@media(max-width:700px){.stats-grid{grid-template-columns:1fr 1fr}.stats-grid .stat-card:first-child{grid-column:1/-1}.progress-columns{grid-template-columns:1fr}.filter-grid{grid-template-columns:1fr}.tasks-table td:nth-child(4),.tasks-table th:nth-child(4),.tasks-table td:nth-child(5),.tasks-table th:nth-child(5){display:none}.status-legend td:nth-child(2),.status-legend th:nth-child(2){display:table-cell!important}}
 </style></head><body>
 <div class=top>
 <div class=brandbar>
@@ -864,8 +1070,30 @@ body{
 </div>
 </div>
 <div class=wrap><div><button onclick="showTab('dashboard')">Dashboard</button> <button onclick="showTab('tasks')">Tasks</button> <button onclick="showTab('reports')">Reports</button> <button onclick="showTab('phases')">Phases</button> <button onclick="showTab('notifications')">Notif</button></div>
-<section id=dashboard class=section><h2>Workers</h2><div id=workers class=grid></div><h2>Project</h2><div id=project class=card></div></section>
-<section id=tasks class="section hidden"><h2>Queue / Tasks</h2><div class=card><table><thead><tr><th>ID</th><th>Agent</th><th>Status</th><th>Checkpoint</th><th>Attempts</th></tr></thead><tbody id=taskrows></tbody></table></div></section>
+<section id=dashboard class=section>
+<h2>Ringkasan Proyek</h2>
+<div id=projectSummary class=stats-grid></div>
+<div id=project class="card project-main"></div>
+<h2>Progress Checkpoint</h2>
+<div id=checkpointProgress class=progress-columns></div>
+<h2>Pipeline Phase</h2>
+<div id=phasePipeline class=phase-pipeline></div>
+<h2>Workers</h2>
+<div id=workers class=grid></div>
+<h2>Notifikasi Telegram</h2>
+<div id=telegramCard class=card></div>
+</section>
+<section id=tasks class="section hidden">
+<h2>Antrean / Tasks</h2>
+<div class="card filter-card"><div class=filter-grid>
+<label>Agent<select id=taskAgentFilter onchange=renderTasks()><option value="">Semua Agent</option></select></label>
+<label>Status<select id=taskStatusFilter onchange=renderTasks()><option value="">Semua Status</option></select></label>
+<label>Checkpoint<select id=taskCheckpointFilter onchange=renderTasks()><option value="">Semua Checkpoint</option></select></label>
+</div></div>
+<div class=card><table class=tasks-table><thead><tr><th>ID</th><th>Agent</th><th>Status</th><th>Checkpoint</th><th>Percobaan</th></tr></thead><tbody id=taskrows></tbody></table><div id=taskEmpty class="muted task-empty hidden">Tidak ada task yang cocok dengan filter.</div></div>
+<h3>Keterangan Status</h3>
+<div class=card><table class=status-legend><thead><tr><th>Status</th><th>Keterangan</th></tr></thead><tbody id=statusLegendRows></tbody></table></div>
+</section>
 <section id=reports class="section hidden"><h2>Reports</h2><div id=reportlist class=grid></div></section>
 <section id=phases class="section hidden"><h2>Upload Phase</h2><div class=card><input id=phasefile type=file accept=".md,.zip"> <button onclick=uploadPhase()>Upload & Validate</button><div id=phaseout class=muted></div></div><h3>Uploads</h3><div id=phaselist></div></section>
 <section id=notifications class="section hidden"><h2>Notifications</h2><button onclick=readAll()>Tandai semua dibaca</button><div id=notifs></div></section></div>
@@ -899,7 +1127,15 @@ function fmtWIB(v){
 }
 
 function showTab(id){document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
-async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class="card worker-card" onclick="openWorker('${x.id}')"><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED','WAITING_REVISION'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="event.stopPropagation();act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="event.stopPropagation();act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class="card report-card" onclick="openReport('${x.id}')"><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}<br>Masuk panel: ${esc(fmtWIB(x.first_seen_at))}</p><button onclick="event.stopPropagation();openReport('${x.id}')">Lihat detail</button></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+let allTasks=[];
+const STATUS_MAP={QUEUED:['🕒','Antrean'],RUNNING:['🔵','Sedang dikerjakan'],READY_FOR_AUDIT:['🟣','Siap diaudit'],WAITING_DEPENDENCY:['🔒','Menunggu dependensi'],PASS_CANDIDATE:['🟡','Kandidat lulus'],FINAL_PASS:['✅','Lulus final'],REVISE_REQUIRED:['🔁','Perlu revisi'],REVISE:['🔁','Sedang revisi'],COMPLETED:['✅','Selesai'],BLOCKED:['⛔','Terblokir'],ERROR:['🚨','Error'],WAITING:['⏸️','Menunggu'],AUDITING:['🔍','Sedang audit'],WAITING_REVISION:['🔁','Menunggu revisi'],PAUSED:['⏸️','Dijeda'],OFFLINE:['⚫','Offline'],RECOVERING:['🛠️','Pemulihan'],CANCELLED:['🚫','Dibatalkan'],PENDING:['⚪','Belum dimulai'],ACTIVE:['🚀','Aktif'],VALIDATED:['📦','Tervalidasi']};
+function statusLabel(raw){const x=STATUS_MAP[String(raw||'PENDING')]||['ℹ️',String(raw||'-')];return `${x[0]} ${x[1]}`}
+function statusClass(raw){if(['FINAL_PASS','COMPLETED','RUNNING','AUDITING','ACTIVE'].includes(raw))return 'good';if(['BLOCKED','ERROR'].includes(raw))return 'bad';return 'warn'}
+function populateFilter(id,values,labeler=(x)=>x){const el=document.getElementById(id);const current=el.value;const first=el.options[0]?.outerHTML||'<option value="">Semua</option>';el.innerHTML=first+[...new Set(values.filter(Boolean))].sort().map(v=>`<option value="${esc(v)}">${esc(labeler(v))}</option>`).join('');if([...el.options].some(o=>o.value===current))el.value=current}
+function renderTasks(){const agent=document.getElementById('taskAgentFilter')?.value||'';const state=document.getElementById('taskStatusFilter')?.value||'';const cp=document.getElementById('taskCheckpointFilter')?.value||'';const rows=allTasks.filter(x=>(!agent||x.target_agent===agent)&&(!state||x.state===state)&&(!cp||x.checkpoint===cp));taskrows.innerHTML=rows.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td><span class="pill ${statusClass(x.state)}">${esc(statusLabel(x.state))}</span></td><td>${esc(x.checkpoint||'-')}</td><td>${esc(x.attempts??0)}</td></tr>`).join('');document.getElementById('taskEmpty').classList.toggle('hidden',rows.length>0)}
+function checkpointCard(title,items,pct){return `<div class=card><b>${esc(title)}</b><div class=mini-note>${pct}% checkpoint Lulus Final</div><div class=bar><span style="width:${pct}%"></span></div><div class=checkpoint-list>${items.map(x=>`<div class=checkpoint-row><span>${esc(x.checkpoint)}</span><span class=status-text>${esc(statusLabel(x.state))}</span></div>`).join('')}</div></div>`}
+async function refresh(){const [p,w,t,n,r,ph,stats,tg]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases'),api('/api/project/stats'),api('/api/telegram-status')]);allTasks=t;projectSummary.innerHTML=`<div class=stat-card><div class=big>${esc(stats.overall_percent)}%</div><div class=small>Progress Phase ${esc(stats.current_phase)}</div><div class=bar><span style="width:${stats.overall_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.backend_percent)}%</div><div class=small>Backend</div><div class=bar><span style="width:${stats.backend_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.frontend_percent)}%</div><div class=small>Frontend</div><div class=bar><span style="width:${stats.frontend_percent}%"></span></div></div>`;project.innerHTML=`<b>Phase ${esc(stats.current_phase)} · ${esc(String(stats.phase_status).toUpperCase())}</b><div class=mini-note>Berikutnya: ${esc(stats.next_action)}</div><div class=mini-note>Backend HEAD ${esc(p.backend_git?.head_sha?.slice(0,8)||'-')} · Frontend HEAD ${esc(p.frontend_git?.head_sha?.slice(0,8)||'-')}</div>`;checkpointProgress.innerHTML=checkpointCard('🧠 Backend',stats.backend,stats.backend_percent)+checkpointCard('🖥️ Frontend',stats.frontend,stats.frontend_percent);phasePipeline.innerHTML=stats.phase_pipeline.map(x=>`<div class=phase-chip><b>Phase ${esc(x.phase)}</b><div class=mini-note>${esc(statusLabel(x.state))}</div></div>`).join('');const statWorkers=Object.fromEntries((stats.workers||[]).map(x=>[x.id,x]));workers.innerHTML=w.map(x=>{const sw=statWorkers[x.id]||{};return `<div class="card worker-card" onclick="openWorker('${x.id}')"><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${statusClass(x.status)}">${esc(statusLabel(x.status))}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div><div class=worker-reason><b>Keterangan:</b><br>${esc(sw.reason||x.current_activity||'Tidak ada keterangan.')}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="event.stopPropagation();act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Lanjutkan':'Jeda'}</button> <button onclick="event.stopPropagation();act('${x.id}','retry')">Ulangi</button></p>`:''}</div>`}).join('');telegramCard.innerHTML=`<b>${tg.configured?'✅ Telegram aktif':'⚠️ Telegram belum aktif'}</b><div class=mini-note>Status service: ${esc(statusLabel(tg.status))}</div><div class=mini-note>Event penting belum terkirim: ${esc(tg.pending_important_events)}</div><div class=mini-note>${esc(tg.last_log||'Belum ada log notifier.')}</div>${tg.configured?'<p><button onclick="testTelegram()">Kirim notifikasi tes</button></p>':'<div class=mini-note>Notifier memerlukan TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di environment service. Nilai rahasia tidak ditampilkan di panel.</div>'}`;populateFilter('taskAgentFilter',allTasks.map(x=>x.target_agent),x=>x.toUpperCase());populateFilter('taskStatusFilter',allTasks.map(x=>x.state),statusLabel);populateFilter('taskCheckpointFilter',allTasks.map(x=>x.checkpoint));renderTasks();statusLegendRows.innerHTML=(stats.status_legend||[]).map(x=>`<tr><td>${esc(x.icon+' '+x.label)}</td><td>${esc(x.detail)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class="card report-card" onclick="openReport('${x.id}')"><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}<br>Masuk panel: ${esc(fmtWIB(x.first_seen_at))}</p><button onclick="event.stopPropagation();openReport('${x.id}')">Lihat detail</button></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(statusLabel(x.status))}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Setujui / antrekan Phase</button></p>`:''}</div>`).join('')}
+async function testTelegram(){try{let x=await api('/api/telegram-test',{method:'POST'});alert(x.message||'Event tes dibuat');setTimeout(refresh,1200)}catch(e){alert(e.message)}}
 
 let detailTimer=null;
 let detailKind=null;
