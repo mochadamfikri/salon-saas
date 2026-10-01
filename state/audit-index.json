@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T14:26:16.702975+00:00",
+  "generated_at": "2026-10-01T14:26:48.943638+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -10,7 +10,7 @@
       "state": "FINAL_PASS",
       "created_at": "2026-10-01T07:10:23.911935+00:00",
       "started_at": "2026-10-01T08:53:35.497067+00:00",
-      "finished_at": "2026-10-01T14:25:50.055315+00:00",
+      "finished_at": "2026-10-01T14:26:20.658342+00:00",
       "attempts": 1,
       "authoritative_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
       "last_error": null,
@@ -38,7 +38,7 @@
       "state": "FINAL_PASS",
       "created_at": "2026-10-01T12:55:15.876897+00:00",
       "started_at": "2026-10-01T13:09:20.207953+00:00",
-      "finished_at": "2026-10-01T14:25:50.047185+00:00",
+      "finished_at": "2026-10-01T14:26:20.650134+00:00",
       "attempts": 1,
       "authoritative_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
       "last_error": null,
