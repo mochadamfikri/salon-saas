@@ -126,6 +126,14 @@ export interface BackendStaffAssignment { id: string; staff_profile_id: string; 
 export interface BackendAvailability { id: string; staff_profile_id: string; day_of_week: number; start_time: string; end_time: string; is_available: boolean; created_at: string; updated_at: string }
 export interface BackendAvailabilityWrite { day_of_week?: number; start_time?: string; end_time?: string }
 
+export interface BackendSalonCustomer {
+  id: string; salon_id: string; full_name: string; email: string | null; phone: string | null;
+  notes: string | null; created_at: string; updated_at: string;
+}
+export interface BackendSalonCustomerWrite {
+  full_name?: string; email?: string | null; phone?: string | null; notes?: string | null;
+}
+
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
  * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).

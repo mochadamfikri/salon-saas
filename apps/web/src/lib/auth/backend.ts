@@ -16,6 +16,8 @@ import type {
   BackendRegisterRequest,
   BackendSalon,
   BackendSalonCreateRequest,
+  BackendSalonCustomer,
+  BackendSalonCustomerWrite,
   BackendSalonService,
   BackendSalonServiceCreateRequest,
   BackendSalonServiceUpdateRequest,
@@ -231,6 +233,22 @@ export class BackendClient {
 
   getMySalons(accessToken: string): Promise<BackendResult<BackendMySalon[]>> {
     return this.request<BackendMySalon[]>("/me/salons", { method: "GET", accessToken });
+  }
+
+  listCustomers(accessToken: string, salonId: string): Promise<BackendResult<BackendSalonCustomer[]>> {
+    return this.request<BackendSalonCustomer[]>(`/salons/${encodeURIComponent(salonId)}/customers`, { method: "GET", accessToken });
+  }
+
+  getCustomer(accessToken: string, salonId: string, customerId: string): Promise<BackendResult<BackendSalonCustomer>> {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers/${encodeURIComponent(customerId)}`, { method: "GET", accessToken });
+  }
+
+  createCustomer(accessToken: string, salonId: string, body: BackendSalonCustomerWrite): Promise<BackendResult<BackendSalonCustomer>> {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers`, { method: "POST", body, accessToken });
+  }
+
+  updateCustomer(accessToken: string, salonId: string, customerId: string, body: BackendSalonCustomerWrite): Promise<BackendResult<BackendSalonCustomer>> {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers/${encodeURIComponent(customerId)}`, { method: "PATCH", body, accessToken });
   }
 
   listServices(accessToken: string, salonId: string): Promise<BackendResult<BackendSalonService[]>> {
