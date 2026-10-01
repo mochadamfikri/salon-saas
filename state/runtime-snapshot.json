@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T18:30:26.501978+00:00",
+  "generated_at": "2026-10-01T18:30:58.854665+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "PHASE2-CLOSURE",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c08e42d09407f8493e64e4ad8b21ff43c01b6e6d",
-      "last_heartbeat": "2026-10-01T18:30:16.822298+00:00",
+      "last_heartbeat": "2026-10-01T18:30:46.833130+00:00",
       "current_stage": "Audit complete",
       "current_activity": "Pre-audit selesai; menunggu final review",
       "progress_pct": 100,
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "93c463c35cef2f0ef17628a278fae7d526eed673",
-      "last_heartbeat": "2026-10-01T18:30:02.897853+00:00",
+      "last_heartbeat": "2026-10-01T18:30:32.910385+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,10 +41,10 @@
       "checkpoint": "PHASE2-CLOSURE",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c08e42d09407f8493e64e4ad8b21ff43c01b6e6d",
-      "last_heartbeat": "2026-10-01T18:30:24.775813+00:00",
-      "current_stage": "Final review selesai",
-      "current_activity": "PHASE2-CLOSURE FINAL_PASS; menunggu kandidat berikutnya",
-      "progress_pct": 100,
+      "last_heartbeat": "2026-10-01T18:30:54.811281+00:00",
+      "current_stage": "Menunggu kandidat",
+      "current_activity": "Menunggu PASS_CANDIDATE yang eligible",
+      "progress_pct": 0,
       "last_successful_checkpoint": "PHASE2-CLOSURE"
     },
     {
@@ -56,7 +56,7 @@
       "checkpoint": "PHASE2-CLOSURE",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c08e42d09407f8493e64e4ad8b21ff43c01b6e6d",
-      "last_heartbeat": "2026-10-01T18:30:02.895703+00:00",
+      "last_heartbeat": "2026-10-01T18:30:32.909029+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -71,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T18:30:13.425197+00:00",
+      "last_heartbeat": "2026-10-01T18:30:47.471934+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
