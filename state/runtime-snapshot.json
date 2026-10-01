@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T21:47:16.748349+00:00",
+  "generated_at": "2026-10-01T21:47:48.974983+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P3-B",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "d1b60a769359cc33868d1ed263c36116a7888ea9",
-      "last_heartbeat": "2026-10-01T21:47:15.146433+00:00",
+      "last_heartbeat": "2026-10-01T21:47:47.954713+00:00",
       "current_stage": "Inspecting",
       "current_activity": "Memeriksa source / diff",
-      "progress_pct": 28,
+      "progress_pct": 96,
       "last_successful_checkpoint": "P3-A"
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "93c463c35cef2f0ef17628a278fae7d526eed673",
-      "last_heartbeat": "2026-10-01T21:47:09.868309+00:00",
+      "last_heartbeat": "2026-10-01T21:47:39.885879+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P3-A",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "c5368f42fc94fc17c01f1281f9a01ba44eee2ea4",
-      "last_heartbeat": "2026-10-01T21:47:06.804618+00:00",
+      "last_heartbeat": "2026-10-01T21:47:46.843958+00:00",
       "current_stage": "Menunggu kandidat",
       "current_activity": "Menunggu PASS_CANDIDATE yang eligible",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": "P3-B",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "d1b60a769359cc33868d1ed263c36116a7888ea9",
-      "last_heartbeat": "2026-10-01T21:46:59.201973+00:00",
+      "last_heartbeat": "2026-10-01T21:47:29.220923+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -71,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T21:47:01.949604+00:00",
+      "last_heartbeat": "2026-10-01T21:47:47.002498+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
