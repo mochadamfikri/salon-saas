@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T21:06:16.656463+00:00",
+  "generated_at": "2026-10-01T21:06:49.069940+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P3-B",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "49d6bc298e2f6ce15b90d8fb2b10a9c6d5969366",
-      "last_heartbeat": "2026-10-01T21:04:21.682348+00:00",
-      "current_stage": "Trusted verification",
-      "current_activity": "Menjalankan pytest dan quality gates backend di host terisolasi",
-      "progress_pct": 35,
+      "last_heartbeat": "2026-10-01T21:06:46.447536+00:00",
+      "current_stage": "Reporting",
+      "current_activity": "Menyiapkan report / handoff",
+      "progress_pct": 96,
       "last_successful_checkpoint": "P3-A"
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "93c463c35cef2f0ef17628a278fae7d526eed673",
-      "last_heartbeat": "2026-10-01T21:06:08.334133+00:00",
+      "last_heartbeat": "2026-10-01T21:06:38.353952+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P3-A",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "c5368f42fc94fc17c01f1281f9a01ba44eee2ea4",
-      "last_heartbeat": "2026-10-01T21:06:14.471755+00:00",
+      "last_heartbeat": "2026-10-01T21:06:44.505467+00:00",
       "current_stage": "Menunggu kandidat",
       "current_activity": "Menunggu PASS_CANDIDATE yang eligible",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": "P3-B",
       "branch": "feature/phase-3-booking-engine",
       "head_sha": "49d6bc298e2f6ce15b90d8fb2b10a9c6d5969366",
-      "last_heartbeat": "2026-10-01T21:06:06.488752+00:00",
+      "last_heartbeat": "2026-10-01T21:06:36.505487+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -71,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T21:06:12.629413+00:00",
+      "last_heartbeat": "2026-10-01T21:06:42.663272+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
