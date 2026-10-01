@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T18:20:09.684034+00:00",
+  "generated_at": "2026-10-01T18:20:42.407282+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "93c463c35cef2f0ef17628a278fae7d526eed673",
-      "last_heartbeat": "2026-10-01T18:20:02.543451+00:00",
+      "last_heartbeat": "2026-10-01T18:20:32.565211+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "93c463c35cef2f0ef17628a278fae7d526eed673",
-      "last_heartbeat": "2026-10-01T18:20:02.964713+00:00",
+      "last_heartbeat": "2026-10-01T18:20:32.990724+00:00",
       "current_stage": "Menunggu kandidat",
       "current_activity": "Menunggu PASS_CANDIDATE yang eligible",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": "PHASE2-CLOSURE",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c08e42d09407f8493e64e4ad8b21ff43c01b6e6d",
-      "last_heartbeat": "2026-10-01T18:20:02.530614+00:00",
+      "last_heartbeat": "2026-10-01T18:20:32.552550+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -71,7 +71,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T18:19:57.064625+00:00",
+      "last_heartbeat": "2026-10-01T18:20:42.130555+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
