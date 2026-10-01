@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T11:27:57.935283+00:00",
+  "generated_at": "2026-10-01T11:28:30.272396+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "c21697776e6ce8752afe1168f47ed3a2f19c9b7a",
-      "last_heartbeat": "2026-10-01T11:27:55.712173+00:00",
-      "current_stage": "Trusted verification",
-      "current_activity": "Menjalankan Vitest, TypeScript, ESLint, dan build frontend",
-      "progress_pct": 35,
+      "last_heartbeat": "2026-10-01T11:28:28.619953+00:00",
+      "current_stage": "Testing",
+      "current_activity": "Menjalankan test",
+      "progress_pct": 96,
       "last_successful_checkpoint": "P2-E"
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "c21697776e6ce8752afe1168f47ed3a2f19c9b7a",
-      "last_heartbeat": "2026-10-01T11:27:52.038951+00:00",
+      "last_heartbeat": "2026-10-01T11:28:22.054814+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T11:27:41.859815+00:00",
+      "last_heartbeat": "2026-10-01T11:28:11.874516+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T11:27:50.843901+00:00",
+      "last_heartbeat": "2026-10-01T11:28:20.882935+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
