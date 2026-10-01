@@ -1,0 +1,9 @@
+{
+  "agent": "codex",
+  "role": "frontend_engineer",
+  "workspace": "/home/ubuntu/salon-saas-frontend",
+  "branch": "feature/phase-2-web-codex",
+  "status": "WAITING",
+  "current_checkpoint": null,
+  "last_audited_checkpoint": "P2-B"
+}

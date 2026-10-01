@@ -1,0 +1,9 @@
+{
+  "agent": "hermes",
+  "role": "backend_engineer",
+  "workspace": "/home/ubuntu/salon-saas",
+  "branch": "feature/phase-2-salon-operations",
+  "status": "ACTIVE",
+  "current_checkpoint": "P2-E",
+  "last_audited_checkpoint": "P2-C"
+}

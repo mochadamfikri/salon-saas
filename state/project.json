@@ -1,0 +1,20 @@
+{
+  "project": "salon-saas",
+  "phase": 2,
+  "phase_status": "active",
+  "backend": {
+    "P2-A": "FINAL_PASS",
+    "P2-B": "FINAL_PASS",
+    "P2-C": "FINAL_PASS",
+    "P2-D": "READY_FOR_AUDIT",
+    "P2-E": "IN_PROGRESS"
+  },
+  "frontend": {
+    "Phase1": "FINAL_PASS",
+    "P2-B": "FINAL_PASS",
+    "P2-C": "PENDING",
+    "P2-D": "PENDING",
+    "P2-E": "PENDING"
+  },
+  "note": "Runtime state must be refreshed from Git before dispatching work."
+}

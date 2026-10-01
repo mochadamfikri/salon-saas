@@ -1,0 +1,31 @@
+items:
+  - id: dashboard
+    label: Dashboard
+    path: /
+  - id: workers
+    label: Workers
+    path: /workers
+  - id: tasks
+    label: Queue / Tasks
+    path: /tasks
+  - id: phases
+    label: Phases
+    path: /phases
+  - id: reports
+    label: Reports
+    path: /reports
+  - id: audits
+    label: Audits
+    path: /audits
+  - id: notifications
+    label: Notifications
+    path: /notifications
+  - id: business-decisions
+    label: Business Decisions
+    path: /business-decisions
+  - id: logs
+    label: Logs
+    path: /logs
+  - id: settings
+    label: Settings
+    path: /settings

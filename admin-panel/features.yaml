@@ -1,0 +1,40 @@
+realtime:
+  transport: sse
+  heartbeat_seconds: 5
+  offline_after_seconds: 30
+  polling_fallback_seconds: 15
+
+workers:
+  ids:
+    - hermes
+    - codex
+    - auditor
+    - notifier
+  allowed_actions:
+    - pause
+    - resume
+    - retry
+    - refresh
+
+notifications:
+  bell: true
+  unread_badge: true
+  telegram: true
+
+phases:
+  upload_markdown: true
+  upload_zip: true
+  preview_before_activate: true
+  explicit_activation_required: true
+
+reports:
+  rendered_markdown: true
+  raw_markdown: true
+  download_single: true
+  download_phase_zip: true
+
+security:
+  raw_shell: false
+  force_push: false
+  merge_button: false
+  production_deploy_button: false
