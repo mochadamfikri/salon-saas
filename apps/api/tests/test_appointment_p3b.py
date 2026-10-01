@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 from app.models import (
@@ -696,3 +697,312 @@ def test_same_utc_instant_different_timezone_fails(db_session: Session, p3b_full
             ends_at=ends_at,
             timezone_name="America/New_York",
         )
+
+
+# ============================================================================
+# DST Transition Tests
+# ============================================================================
+
+
+def test_appointment_duration_preserved_across_spring_forward_dst(db_session: Session):
+    """Verify appointment duration is exact across spring-forward DST transition.
+
+    On Sunday, March 8, 2026, America/New_York clocks jump from 02:00 EST to 03:00 EDT.
+    An appointment starting at 01:30 local time with 60-minute duration should end at
+    03:30 local time (skipping the non-existent 02:00-03:00 hour). The absolute elapsed
+    time in UTC must be exactly 60 minutes (3600 seconds), not wall-clock time.
+    """
+    unique_suffix = uuid.uuid4().hex[:8]
+
+    # Setup: User, Salon, Membership, Service, Staff, Assignment, Availability
+    owner = User(id=uuid.uuid4(), email=f"owner_{unique_suffix}@example.com", password_hash="hash")
+    db_session.add(owner)
+    db_session.flush()
+
+    salon = Salon(
+        id=uuid.uuid4(),
+        name="DST Test Salon",
+        slug=f"dst-salon-{unique_suffix}",
+        created_by_user_id=owner.id,
+        status="active",
+    )
+    db_session.add(salon)
+    db_session.flush()
+
+    membership = SalonMembership(
+        id=uuid.uuid4(), salon_id=salon.id, user_id=owner.id, role="owner", status="active"
+    )
+    db_session.add(membership)
+    db_session.flush()
+
+    service = SalonService(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        name="Haircut",
+        duration_minutes=60,
+        price_amount=Decimal("100.00"),
+        currency="USD",
+        is_active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    staff_profile = StaffProfile(
+        id=uuid.uuid4(), membership_id=membership.id, display_name="DST Stylist", is_bookable=True
+    )
+    db_session.add(staff_profile)
+    db_session.flush()
+
+    assignment = StaffServiceAssignment(
+        id=uuid.uuid4(), staff_profile_id=staff_profile.id, salon_service_id=service.id
+    )
+    db_session.add(assignment)
+    db_session.flush()
+
+    # Availability: Sunday (day_of_week=6) from 00:00 to 06:00
+    availability = StaffWeeklyAvailability(
+        id=uuid.uuid4(),
+        staff_profile_id=staff_profile.id,
+        day_of_week=6,
+        start_time=time(0, 0),
+        end_time=time(6, 0),
+        is_available=True,
+    )
+    db_session.add(availability)
+    db_session.flush()
+
+    customer = SalonCustomer(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        full_name="DST Customer",
+        email=f"customer_{unique_suffix}@example.com",
+    )
+    db_session.add(customer)
+    db_session.flush()
+
+    # Sunday, March 8, 2026, 01:30 EST (UTC-5) = 06:30 UTC
+    # After DST transition at 02:00->03:00, ends at 03:30 EDT (UTC-4) = 07:30 UTC
+    starts_at_local = datetime(2026, 3, 8, 1, 30, tzinfo=ZoneInfo("America/New_York"))
+    appointment = create_appointment(
+        db=db_session,
+        salon_id=salon.id,
+        customer_id=customer.id,
+        service_id=service.id,
+        staff_profile_id=staff_profile.id,
+        starts_at=starts_at_local,
+        timezone_name="America/New_York",
+    )
+    db_session.commit()
+
+    # Verify appointment instants are stored in UTC
+    assert appointment.starts_at.tzinfo is not None
+    assert appointment.ends_at.tzinfo is not None
+
+    # Verify exact elapsed duration is 60 minutes (3600 seconds) in UTC
+    elapsed = appointment.ends_at - appointment.starts_at
+    assert elapsed == timedelta(minutes=60)
+    assert elapsed.total_seconds() == 3600.0
+
+    # Verify snapshot
+    assert appointment.duration_minutes_snapshot == 60
+
+
+def test_appointment_duration_preserved_across_fall_back_dst(db_session: Session):
+    """Verify appointment duration is exact across fall-back DST transition.
+
+    On Sunday, November 1, 2026, America/New_York clocks fall back from 02:00 EDT to
+    01:00 EST. An appointment starting at 01:30 EDT (fold=0) with 60-minute duration
+    should end at the repeated 01:30 EST (fold=1). The absolute elapsed time in UTC must
+    be exactly 60 minutes (3600 seconds), not ambiguous wall-clock time.
+    """
+    unique_suffix = uuid.uuid4().hex[:8]
+
+    owner = User(id=uuid.uuid4(), email=f"owner_{unique_suffix}@example.com", password_hash="hash")
+    db_session.add(owner)
+    db_session.flush()
+
+    salon = Salon(
+        id=uuid.uuid4(),
+        name="DST Test Salon 2",
+        slug=f"dst-salon-2-{unique_suffix}",
+        created_by_user_id=owner.id,
+        status="active",
+    )
+    db_session.add(salon)
+    db_session.flush()
+
+    membership = SalonMembership(
+        id=uuid.uuid4(), salon_id=salon.id, user_id=owner.id, role="owner", status="active"
+    )
+    db_session.add(membership)
+    db_session.flush()
+
+    service = SalonService(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        name="Haircut",
+        duration_minutes=60,
+        price_amount=Decimal("100.00"),
+        currency="USD",
+        is_active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    staff_profile = StaffProfile(
+        id=uuid.uuid4(), membership_id=membership.id, display_name="DST Stylist 2", is_bookable=True
+    )
+    db_session.add(staff_profile)
+    db_session.flush()
+
+    assignment = StaffServiceAssignment(
+        id=uuid.uuid4(), staff_profile_id=staff_profile.id, salon_service_id=service.id
+    )
+    db_session.add(assignment)
+    db_session.flush()
+
+    # Availability: Sunday (day_of_week=6) from 00:00 to 06:00
+    availability = StaffWeeklyAvailability(
+        id=uuid.uuid4(),
+        staff_profile_id=staff_profile.id,
+        day_of_week=6,
+        start_time=time(0, 0),
+        end_time=time(6, 0),
+        is_available=True,
+    )
+    db_session.add(availability)
+    db_session.flush()
+
+    customer = SalonCustomer(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        full_name="DST Customer 2",
+        email=f"customer2_{unique_suffix}@example.com",
+    )
+    db_session.add(customer)
+    db_session.flush()
+
+    # Sunday, November 1, 2026, 01:30 EDT (fold=0, first occurrence, UTC-4) = 05:30 UTC
+    # 60 minutes later = 06:30 UTC = 01:30 EST (fold=1, second occurrence, UTC-5)
+    starts_at_local = datetime(2026, 11, 1, 1, 30, fold=0, tzinfo=ZoneInfo("America/New_York"))
+    appointment = create_appointment(
+        db=db_session,
+        salon_id=salon.id,
+        customer_id=customer.id,
+        service_id=service.id,
+        staff_profile_id=staff_profile.id,
+        starts_at=starts_at_local,
+        timezone_name="America/New_York",
+    )
+    db_session.commit()
+
+    # Verify appointment instants are stored in UTC
+    assert appointment.starts_at.tzinfo is not None
+    assert appointment.ends_at.tzinfo is not None
+
+    # Verify exact elapsed duration is 60 minutes (3600 seconds) in UTC
+    elapsed = appointment.ends_at - appointment.starts_at
+    assert elapsed == timedelta(minutes=60)
+    assert elapsed.total_seconds() == 3600.0
+
+    # Verify snapshot
+    assert appointment.duration_minutes_snapshot == 60
+
+
+def test_adjacent_appointments_across_dst_transition(db_session: Session):
+    """Verify adjacent appointments do not conflict across DST transition."""
+    unique_suffix = uuid.uuid4().hex[:8]
+
+    owner = User(id=uuid.uuid4(), email=f"owner_{unique_suffix}@example.com", password_hash="hash")
+    db_session.add(owner)
+    db_session.flush()
+
+    salon = Salon(
+        id=uuid.uuid4(),
+        name="DST Adjacent Test",
+        slug=f"dst-adj-{unique_suffix}",
+        created_by_user_id=owner.id,
+        status="active",
+    )
+    db_session.add(salon)
+    db_session.flush()
+
+    membership = SalonMembership(
+        id=uuid.uuid4(), salon_id=salon.id, user_id=owner.id, role="owner", status="active"
+    )
+    db_session.add(membership)
+    db_session.flush()
+
+    service = SalonService(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        name="Haircut",
+        duration_minutes=60,
+        price_amount=Decimal("100.00"),
+        currency="USD",
+        is_active=True,
+    )
+    db_session.add(service)
+    db_session.flush()
+
+    staff_profile = StaffProfile(
+        id=uuid.uuid4(), membership_id=membership.id, display_name="DST Stylist 3", is_bookable=True
+    )
+    db_session.add(staff_profile)
+    db_session.flush()
+
+    assignment = StaffServiceAssignment(
+        id=uuid.uuid4(), staff_profile_id=staff_profile.id, salon_service_id=service.id
+    )
+    db_session.add(assignment)
+    db_session.flush()
+
+    availability = StaffWeeklyAvailability(
+        id=uuid.uuid4(),
+        staff_profile_id=staff_profile.id,
+        day_of_week=6,
+        start_time=time(0, 0),
+        end_time=time(6, 0),
+        is_available=True,
+    )
+    db_session.add(availability)
+    db_session.flush()
+
+    customer = SalonCustomer(
+        id=uuid.uuid4(),
+        salon_id=salon.id,
+        full_name="DST Adjacent Customer",
+        email=f"customer3_{unique_suffix}@example.com",
+    )
+    db_session.add(customer)
+    db_session.flush()
+
+    # First appointment: 01:30 EST (06:30 UTC) for 60 minutes
+    starts_at_1 = datetime(2026, 3, 8, 1, 30, tzinfo=ZoneInfo("America/New_York"))
+    appointment1 = create_appointment(
+        db=db_session,
+        salon_id=salon.id,
+        customer_id=customer.id,
+        service_id=service.id,
+        staff_profile_id=staff_profile.id,
+        starts_at=starts_at_1,
+        timezone_name="America/New_York",
+    )
+    db_session.commit()
+
+    # Second appointment: starts exactly when first ends (adjacent, no overlap)
+    starts_at_2 = appointment1.ends_at
+    appointment2 = create_appointment(
+        db=db_session,
+        salon_id=salon.id,
+        customer_id=customer.id,
+        service_id=service.id,
+        staff_profile_id=staff_profile.id,
+        starts_at=starts_at_2,
+        timezone_name="America/New_York",
+    )
+    db_session.commit()
+
+    # Verify adjacency without conflict
+    assert appointment2.starts_at == appointment1.ends_at
+    assert (appointment2.starts_at - appointment1.ends_at).total_seconds() == 0.0

@@ -4,7 +4,7 @@ Phase 3-A provides domain model and lifecycle validator. Phase 3-B adds
 availability/capability validation. Phase 3-C adds API routing.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -417,7 +417,9 @@ def create_appointment(
     )
 
     # Compute ends_at from service duration snapshot
+    # Normalize to UTC before duration arithmetic to avoid DST wall-time issues
     duration = service.duration_minutes
+    starts_at = starts_at.astimezone(UTC)
     ends_at = starts_at + timedelta(minutes=duration)
 
     # P3-B: Validate capability (service active, staff bookable, assignment exists)
