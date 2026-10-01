@@ -202,9 +202,12 @@ def project_stats(request: Request):
     uploads = query_all(
         "SELECT id,phase,status,master_spec_name,created_at,activated_at FROM phase_uploads ORDER BY phase,created_at"
     )
+    closure_audit = query_one("SELECT state FROM tasks WHERE id='AUDIT-PHASE2-CLOSURE'")
+    phase2_final = bool(closure_audit and closure_audit.get("state") == "FINAL_PASS")
+    phase2_state = "FINAL_PASS" if phase2_final else "ACTIVE"
     phase_pipeline = [
         {"phase": 1, "state": "FINAL_PASS", "label": "Selesai"},
-        {"phase": 2, "state": "ACTIVE" if current_phase == 2 else "FINAL_PASS", "label": "Aktif" if current_phase == 2 else "Selesai"},
+        {"phase": 2, "state": phase2_state, "label": status_id(phase2_state)["label"]},
     ]
     seen = {1, 2}
     for u in uploads:
@@ -482,6 +485,7 @@ def _report_roots():
         ("backend", BACKEND_WORKSPACE / "docs/reports", BACKEND_WORKSPACE),
         ("frontend", FRONTEND_WORKSPACE / "docs/reports", FRONTEND_WORKSPACE),
         ("orchestrator", ROOT / "audit", ROOT),
+        ("worker-result", ROOT / "runtime/results", ROOT),
     ]
 
 
@@ -541,7 +545,8 @@ def report_index():
     for agent, base, repo in _report_roots():
         if not base.exists():
             continue
-        for path in base.rglob("*.md"):
+        report_paths = list(base.rglob("*.md")) + list(base.rglob("*.txt"))
+        for path in report_paths:
             report_id = hashlib.sha1(str(path).encode()).hexdigest()[:16]
             existing = con.execute(
                 "SELECT first_seen_at FROM report_registry WHERE id=?",
@@ -599,6 +604,7 @@ def report_detail(request: Request, report_id: str):
             "backend": BACKEND_WORKSPACE,
             "frontend": FRONTEND_WORKSPACE,
             "orchestrator": ROOT,
+            "worker-result": ROOT,
         }[item["agent"]]
 
         return {

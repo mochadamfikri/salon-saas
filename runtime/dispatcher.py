@@ -12,6 +12,10 @@ from common import FRONTEND_WORKSPACE, ROOT, db, emit, git_info, init_db, now_is
 
 POLL = int(os.environ.get("PHASE_DISPATCHER_POLL_SECONDS", "12"))
 FRONTEND_BRANCH = "feature/phase-2-web-codex"
+BACKEND_BRANCH = "feature/phase-2-salon-operations"
+PHASE2_CLOSURE_TASK = "PHASE2-CLOSURE"
+PHASE2_CLOSURE_AUDIT = "AUDIT-PHASE2-CLOSURE"
+PHASE2_CLOSURE_REPORT = "docs/reports/phase2-integration-closure.md"
 
 CHECKPOINTS = [
     {
@@ -333,6 +337,79 @@ def sync_states() -> None:
     con.close()
 
 
+
+def phase2_engineering_ready() -> bool:
+    con = db()
+    try:
+        rows = con.execute("SELECT backend_state,frontend_state FROM workflow_checkpoints WHERE phase=2").fetchall()
+        return len(rows) == 3 and all(r["backend_state"] == "FINAL_PASS" and r["frontend_state"] == "FINAL_PASS" for r in rows)
+    finally:
+        con.close()
+
+def create_phase2_closure() -> None:
+    if get_task(PHASE2_CLOSURE_TASK): return
+    info = git_info(Path("/home/ubuntu/salon-saas")); base = info["head_sha"]
+    if not base: raise RuntimeError("Backend HEAD unavailable for Phase 2 closure")
+    body = f"""TARGET_AGENT: HERMES
+TASK_ID: {PHASE2_CLOSURE_TASK}
+PHASE: 2
+CHECKPOINT: PHASE2-CLOSURE
+TYPE: integration_closure
+PRIORITY: 10
+BASE_SHA: {base}
+SOURCE_BRANCH: {BACKEND_BRANCH}
+STATUS: QUEUED
+
+Run Phase 2 integration closure. This is a quality gate, not a feature checkpoint.
+MANDATORY:
+- Verify all Phase 2 backend and frontend P2-C/P2-D/P2-E are FINAL_PASS.
+- Run full feasible backend regression and Phase 2 integration/contract checks.
+- Verify frontend/backend contracts, tenant isolation, RBAC, validation/null semantics, BFF/session boundaries, and no Phase 1 regression.
+- Treat /home/ubuntu/salon-saas-frontend as read-only integration evidence; do not edit frontend.
+- Do NOT implement Phase 3.
+- Write complete closure report exactly at {PHASE2_CLOSURE_REPORT}.
+- Include commands/checks, pass/fail totals, findings, unresolved blockers, backend HEAD, frontend HEAD, and READY_FOR_AUDIT conclusion.
+- Commit and push the closure report on {BACKEND_BRANCH}; a new pushed commit is required.
+"""
+    path=ROOT/'inbox/hermes'/f'{PHASE2_CLOSURE_TASK}.md'; path.parent.mkdir(parents=True,exist_ok=True); path.write_text(body)
+    register_task(path,'hermes')
+    emit('dispatcher','phase2.closure_queued','INFO','Phase 2 Integration Closure queued','All engineering checkpoints are FINAL_PASS; Hermes closure gate queued.',phase=2,checkpoint='PHASE2-CLOSURE',task_id=PHASE2_CLOSURE_TASK,metadata={'base_sha':base})
+    log(f'PHASE2 CLOSURE QUEUED base={base[:8]}')
+
+def create_phase2_closure_audit() -> None:
+    closure=get_task(PHASE2_CLOSURE_TASK)
+    if not closure or closure['state']!='READY_FOR_AUDIT' or get_task(PHASE2_CLOSURE_AUDIT): return
+    audited=(closure.get('authoritative_sha') or '').strip(); base=parse_base_sha(closure.get('task_path'))
+    if not audited or not base: raise RuntimeError('Unable to resolve Phase 2 closure audit SHAs')
+    body=f"""TARGET_AGENT: AUDITOR
+TASK_ID: {PHASE2_CLOSURE_AUDIT}
+PHASE: 2
+CHECKPOINT: PHASE2-CLOSURE
+TYPE: audit
+PRIORITY: 10
+SOURCE_AGENT: HERMES
+SOURCE_BRANCH: {BACKEND_BRANCH}
+BASE_SHA: {base}
+AUDITED_SHA: {audited}
+REPORT_SOURCE: {PHASE2_CLOSURE_REPORT}
+STATUS: QUEUED
+
+Independently audit Phase 2 integration closure. Require all P2-C/P2-D/P2-E backend+frontend gates FINAL_PASS, regression evidence, contract compatibility, tenant/RBAC safety, zero unresolved blockers, and no Phase 3 implementation. Do not implement fixes.
+"""
+    path=ROOT/'inbox/auditor'/f'{PHASE2_CLOSURE_AUDIT}.md'; path.parent.mkdir(parents=True,exist_ok=True); path.write_text(body)
+    register_task(path,'auditor')
+    emit('dispatcher','phase2.closure_audit_queued','INFO','Phase 2 closure audit queued',f'{PHASE2_CLOSURE_AUDIT} auditing {audited[:8]}.',phase=2,checkpoint='PHASE2-CLOSURE',task_id=PHASE2_CLOSURE_AUDIT,metadata={'base_sha':base,'audited_sha':audited})
+
+def finalize_phase2_if_passed() -> None:
+    audit=get_task(PHASE2_CLOSURE_AUDIT)
+    if not audit or audit['state']!='FINAL_PASS': return
+    con=db(); exists=con.execute("SELECT 1 FROM events WHERE type='phase2.final_pass' LIMIT 1").fetchone(); con.close()
+    if exists: return
+    import yaml
+    phase_file=ROOT/'phase.yaml'; config=yaml.safe_load(phase_file.read_text()) or {}; config['current_phase']=max(3,int(config.get('current_phase',2))); config['phase_status']='active'; phase_file.write_text(yaml.safe_dump(config,sort_keys=False))
+    emit('dispatcher','phase2.final_pass','SUCCESS','Phase 2 → FINAL_PASS','Integration Closure passed audit and autonomous final gate. Phase 3 may now open.',phase=2,checkpoint='PHASE2-CLOSURE',task_id=PHASE2_CLOSURE_AUDIT,metadata={'authoritative_sha':audit.get('authoritative_sha')})
+    log('PHASE2 FINAL_PASS')
+
 def maybe_phase2_ready() -> None:
     con = db()
     rows = con.execute(
@@ -398,6 +475,10 @@ def dispatch_once() -> None:
     close_ready_sources()
     sync_states()
     maybe_phase2_ready()
+    if phase2_engineering_ready():
+        create_phase2_closure()
+    create_phase2_closure_audit()
+    finalize_phase2_if_passed()
 
 
 def main() -> None:
