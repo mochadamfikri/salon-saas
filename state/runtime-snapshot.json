@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T10:38:26.924258+00:00",
+  "generated_at": "2026-10-01T10:38:59.123828+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:37:58.451178+00:00",
+      "last_heartbeat": "2026-10-01T10:38:58.472425+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu audit task",
       "progress_pct": 0,
@@ -26,9 +26,9 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:38:25.844650+00:00",
-      "current_stage": "Testing",
-      "current_activity": "Menjalankan test",
+      "last_heartbeat": "2026-10-01T10:38:58.054926+00:00",
+      "current_stage": "Quality gates",
+      "current_activity": "Menjalankan quality gates",
       "progress_pct": 92,
       "last_successful_checkpoint": "P2-E"
     },
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T10:38:10.378615+00:00",
+      "last_heartbeat": "2026-10-01T10:38:40.394027+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T10:38:26.822859+00:00",
+      "last_heartbeat": "2026-10-01T10:38:56.858644+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
