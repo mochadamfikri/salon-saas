@@ -1,123 +1,54 @@
 # Hermes Handoff
 
 ## Current Branch
-feature/phase-2-salon-operations
+feature/phase-3-booking-engine
 
 ## Phase 1 Status
 Checkpoint A-D PASS.
-Checkpoint E belum selesai.
+Checkpoint E closure tracks separately.
 
 ## Phase 2 Status
-**BACKEND PHASE 2 COMPLETED — READY FOR BATCH AUDIT**
+**PHASE 2 CLOSURE: FINAL PASS** (audited under sha `c08e42d09407f8493e64e4ad8b21ff43c01b6e6d`)
+
+## Phase 3 Status
+**P3-A: READY FOR AUDIT**
 
 ### Checkpoint Status Summary
-- P2-A: FINAL PASS
-- P2-B: FINAL PASS
-- P2-C: FINAL PASS
-  - IMPLEMENTATION SHA: `0c869b3543f6846e87c3fe78528c0bcda70c300a`
-  - REPORT/DOCS SHA: `96ae8cde2891f3c10699ba43f2c1f062ededf6f9`
-- P2-D: READY FOR AUDIT (REVISED)
-  - IMPLEMENTATION SHA: `cdeb8f1`
-  - REPORT/DOCS SHA: `d797720`
-  - REMEDIATION TASK: `REV-P2-D-d797720`
-  - REMEDIATION SHA: `f55b3b3`
-- P2-E: READY FOR AUDIT
-  - IMPLEMENTATION SHA: `177fbbb`
-  - REPORT/DOCS SHA: `6e51a51`
+- P3-A (Booking Domain & Lifecycle): READY FOR AUDIT
+  - Models: `Appointment` ORM model in `apps/api/app/models.py`
+  - Migration: `9ecad5e4f77e_phase_3_booking_engine_core.py`
+  - Lifecycle: `apps/api/app/services/appointment.py`
+  - Tests: `apps/api/tests/test_appointment_p3a.py` (25 tests)
+  - Report: `docs/reports/phase3-p3a-completion-report.md`
+- P3-B (Availability & Capability): WAITING_DEPENDENCY
+- P3-C (Appointment API): WAITING_DEPENDENCY
+- P3-D (Calendar UI): WAITING_DEPENDENCY
+- P3-E (Regression & Closure): WAITING_DEPENDENCY
 
-## Backend Phase 2 Summary
+## Total Test Count
+246 tests PASS (Phase 1 + Phase 2 + P3-A suite)
 
-### Total Test Count
-221 tests PASS (Phase 1 + P2-A through P2-E combined + P2-D remediation tests)
-
-### Phase 2 Integration Closure Status
-**Status:** READY FOR AUDIT
-**Report:** `docs/reports/phase2-integration-closure.md`
-**Backend HEAD:** `aa65ff9` (pushed)
-**Frontend HEAD:** `93c463c` (`feature/phase-2-web-codex`)
-
-### Checkpoint Audit Status Matrix
-- P2-A: FINAL PASS (backend)
-- P2-B: FINAL PASS (backend + frontend)
-- P2-C: FINAL PASS (backend + frontend)
-- P2-D: FINAL PASS (backend + frontend)
-- P2-E: FINAL PASS (backend + frontend)
-- Phase 2 Integration Closure: READY FOR AUDIT
-
-### Quality Gates Status
-- `pytest -q`: PASS (221 passed in 124.83s)
+## Quality Gates Status
+- `pytest -q`: PASS (246 passed in 124.91s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
 
-### Known Warnings
-- Starlette TestClient/httpx deprecation warning (non-blocking)
-- SQLAlchemy transaction cleanup warnings in test fixtures (non-blocking)
-- FastAPI deprecated HTTP_422_UNPROCESSABLE_ENTITY constant (non-blocking)
-- No functional issues
+## Deliverables in P3-A
+- `appointments` table with FK constraints to `salons`, `salon_customers`, `salon_services`, and `staff_profiles` (`RESTRICT` on delete).
+- UTC instants `starts_at` and `ends_at` with check constraint `ends_at > starts_at`.
+- IANA `timezone` column and validation via `zoneinfo`.
+- Snapshots: `service_name_snapshot`, `duration_minutes_snapshot`, `price_amount_snapshot`, `currency_snapshot`.
+- Check constraints: `duration_minutes_snapshot > 0`, `price_amount_snapshot >= 0`, `status IN ('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show')`.
+- Lookup indexes on foreign keys, `starts_at`, and multi-column combinations (`(salon_id, staff_profile_id, starts_at)`, `(salon_id, status, starts_at)`, `(salon_id, customer_id, starts_at)`, `(salon_id, service_id, starts_at)`).
+- Canonical state machine: `scheduled` → `confirmed`/`cancelled`/`completed`/`no_show`; `confirmed` → `completed`/`cancelled`/`no_show`; terminal states cannot transition to different states.
+- Tenant isolation: customer, service, and staff-profile salon ownership verified. Cross-tenant resources raise `CrossTenantResourceError`.
 
-### Phase 2 Deliverables
+## Explicitly Deferred to Later Checkpoints
+- P3-B: Service activation, staff bookability, staff-service assignment verification, weekly availability validation, overlap detection engine, and race-safe concurrency.
+- P3-C: FastAPI routers, request/response schemas, filter params, pagination, and action endpoints (`/confirm`, `/complete`, `/cancel`, `/no-show`).
+- P3-D: Frontend calendar UI, booking creation/rescheduling dialogs, BFF integration.
 
-#### P2-D: Staff Weekly Availability API
-- Endpoints: GET, POST, PATCH, DELETE availability slots
-- RBAC: Owner/Manager manage any profile; Staff manage own profile only
-- Overlap protection: rejects overlapping intervals, allows adjacent slots
-- DB IntegrityError mapping: `uq_staff_weekly_availability_staff_day_start` → 409
-- PATCH validation: rejects explicit null for constraint fields (day_of_week, start_time, end_time)
-- 26 tests (22 original + 4 remediation)
-
-#### P2-E: Customer Records API
-- Endpoints: POST, GET (list), GET (detail), PATCH (no DELETE)
-- RBAC: Owner, Manager, Staff can all create/read/update (operational needs)
-- Duplicate email/phone allowed (no auto-merge)
-- Tenant isolation enforced
-- 11 new tests
-
-### API Endpoints (Full Phase 2)
-```
-# Service Catalog (P2-B)
-POST   /salons/{salon_id}/services
-GET    /salons/{salon_id}/services
-GET    /salons/{salon_id}/services/{service_id}
-PATCH  /salons/{salon_id}/services/{service_id}
-POST   /salons/{salon_id}/services/{service_id}/activate
-POST   /salons/{salon_id}/services/{service_id}/deactivate
-
-# Staff Profile (P2-C)
-POST   /salons/{salon_id}/staff-profiles
-GET    /salons/{salon_id}/staff-profiles
-GET    /salons/{salon_id}/staff-profiles/{staff_profile_id}
-PATCH  /salons/{salon_id}/staff-profiles/{staff_profile_id}
-POST   /salons/{salon_id}/staff-profiles/{staff_profile_id}/toggle-bookable
-POST   /salons/{salon_id}/staff-profiles/{staff_profile_id}/services/{service_id}
-GET    /salons/{salon_id}/staff-profiles/{staff_profile_id}/services
-DELETE /salons/{salon_id}/staff-profiles/{staff_profile_id}/services/{service_id}
-
-# Staff Weekly Availability (P2-D)
-GET    /salons/{salon_id}/staff-profiles/{staff_profile_id}/availability
-POST   /salons/{salon_id}/staff-profiles/{staff_profile_id}/availability
-PATCH  /salons/{salon_id}/staff-profiles/{staff_profile_id}/availability/{availability_id}
-DELETE /salons/{salon_id}/staff-profiles/{staff_profile_id}/availability/{availability_id}
-
-# Customer Records (P2-E)
-POST   /salons/{salon_id}/customers
-GET    /salons/{salon_id}/customers
-GET    /salons/{salon_id}/customers/{customer_id}
-PATCH  /salons/{salon_id}/customers/{customer_id}
-```
-
-### Working Tree Status
-CLEAN (pending docs commit)
-
-### Remote Branch
-origin/feature/phase-2-salon-operations
-Latest implementation push: `177fbbb`
-
-## Next Action
-**STOP — Backend Phase 2 Complete**
-
-After batch audit of P2-D and P2-E:
-- If PASS: merge to develop
-- If remediation needed: address audit findings
-
-DO NOT proceed to Phase 3 until Backend Phase 2 audit is complete.
+## Working Tree Status
+Clean on branch `feature/phase-3-booking-engine`.
+Pushed to `origin/feature/phase-3-booking-engine`.

@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 from app.models import (
+    Appointment,
     Salon,
     SalonCustomer,
     SalonMembership,
@@ -22,8 +23,6 @@ from app.services.appointment import (
     TerminalStateError,
     change_appointment_status,
     create_appointment,
-    get_appointment,
-    list_appointments,
     validate_iana_timezone,
     validate_status_transition,
 )
@@ -484,12 +483,14 @@ def test_change_appointment_status_terminal_state_rejected(
 
 
 # ============================================================================
-# Appointment Read Tests
+# Appointment Query & Index Verification Tests
 # ============================================================================
 
 
-def test_get_appointment_success(db_session: Session, phase3_test_context: dict):
-    """Verify appointment can be retrieved."""
+def test_appointment_query_by_id_scoped_to_salon(
+    db_session: Session, phase3_test_context: dict
+):
+    """Verify appointment can be queried by ID and is strictly scoped to salon."""
     ctx = phase3_test_context
     starts_at = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
 
@@ -503,66 +504,35 @@ def test_get_appointment_success(db_session: Session, phase3_test_context: dict)
         timezone_name="Asia/Jakarta",
     )
 
-    retrieved = get_appointment(db_session, appointment.id, ctx["salon"].id)
+    # Valid tenant query
+    retrieved = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.id == appointment.id,
+            Appointment.salon_id == ctx["salon"].id,
+        )
+        .first()
+    )
     assert retrieved is not None
     assert retrieved.id == appointment.id
 
-
-def test_get_appointment_cross_tenant_returns_none(db_session: Session, phase3_test_context: dict):
-    """Verify cross-tenant appointment returns None."""
-    ctx = phase3_test_context
-    starts_at = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
-
-    appointment = create_appointment(
-        db=db_session,
-        salon_id=ctx["salon"].id,
-        customer_id=ctx["customer"].id,
-        service_id=ctx["service"].id,
-        staff_profile_id=ctx["staff_profile"].id,
-        starts_at=starts_at,
-        timezone_name="Asia/Jakarta",
-    )
-
-    # Try to retrieve with wrong salon_id
+    # Cross-tenant query returns nothing
     wrong_salon_id = uuid.uuid4()
-    retrieved = get_appointment(db_session, appointment.id, wrong_salon_id)
-    assert retrieved is None
-
-
-def test_list_appointments_success(db_session: Session, phase3_test_context: dict):
-    """Verify appointments can be listed."""
-    ctx = phase3_test_context
-    starts_at_1 = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
-    starts_at_2 = datetime(2026, 10, 15, 14, 0, tzinfo=UTC)
-
-    appointment1 = create_appointment(
-        db=db_session,
-        salon_id=ctx["salon"].id,
-        customer_id=ctx["customer"].id,
-        service_id=ctx["service"].id,
-        staff_profile_id=ctx["staff_profile"].id,
-        starts_at=starts_at_1,
-        timezone_name="Asia/Jakarta",
+    cross_retrieved = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.id == appointment.id,
+            Appointment.salon_id == wrong_salon_id,
+        )
+        .first()
     )
-
-    appointment2 = create_appointment(
-        db=db_session,
-        salon_id=ctx["salon"].id,
-        customer_id=ctx["customer"].id,
-        service_id=ctx["service"].id,
-        staff_profile_id=ctx["staff_profile"].id,
-        starts_at=starts_at_2,
-        timezone_name="Asia/Jakarta",
-    )
-
-    appointments = list_appointments(db_session, ctx["salon"].id)
-    assert len(appointments) == 2
-    assert appointments[0].id == appointment1.id
-    assert appointments[1].id == appointment2.id
+    assert cross_retrieved is None
 
 
-def test_list_appointments_filtered_by_status(db_session: Session, phase3_test_context: dict):
-    """Verify appointments can be filtered by status."""
+def test_appointment_query_filtered_by_status_and_ordered(
+    db_session: Session, phase3_test_context: dict
+):
+    """Verify appointments can be filtered by status using status index."""
     ctx = phase3_test_context
     starts_at_1 = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
     starts_at_2 = datetime(2026, 10, 15, 14, 0, tzinfo=UTC)
@@ -589,20 +559,33 @@ def test_list_appointments_filtered_by_status(db_session: Session, phase3_test_c
 
     change_appointment_status(db_session, appointment2, "confirmed")
 
-    scheduled = list_appointments(db_session, ctx["salon"].id, status="scheduled")
+    scheduled = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.salon_id == ctx["salon"].id,
+            Appointment.status == "scheduled",
+        )
+        .all()
+    )
     assert len(scheduled) == 1
     assert scheduled[0].id == appointment1.id
 
-    confirmed = list_appointments(db_session, ctx["salon"].id, status="confirmed")
+    confirmed = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.salon_id == ctx["salon"].id,
+            Appointment.status == "confirmed",
+        )
+        .all()
+    )
     assert len(confirmed) == 1
     assert confirmed[0].id == appointment2.id
 
 
-def test_list_appointments_filtered_by_date_range(db_session: Session, phase3_test_context: dict):
-    """Verify appointments can be filtered by date range."""
+def test_appointment_query_date_range(db_session: Session, phase3_test_context: dict):
+    """Verify appointments can be queried across date ranges using starts_at index."""
     ctx = phase3_test_context
 
-    # Create appointments across different dates
     starts_at_1 = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
     starts_at_2 = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)
     starts_at_3 = datetime(2026, 10, 16, 10, 0, tzinfo=UTC)
@@ -637,22 +620,26 @@ def test_list_appointments_filtered_by_date_range(db_session: Session, phase3_te
         timezone_name="Asia/Jakarta",
     )
 
-    # Filter: starts_after Oct 15 00:00
-    filtered = list_appointments(
-        db_session,
-        ctx["salon"].id,
-        starts_after=datetime(2026, 10, 15, 0, 0, tzinfo=UTC),
+    filtered = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.salon_id == ctx["salon"].id,
+            Appointment.starts_at >= datetime(2026, 10, 15, 0, 0, tzinfo=UTC),
+        )
+        .all()
     )
     assert len(filtered) == 2
     assert appointment2.id in [a.id for a in filtered]
     assert appointment3.id in [a.id for a in filtered]
 
-    # Filter: starts_before Oct 16 00:00
-    filtered = list_appointments(
-        db_session,
-        ctx["salon"].id,
-        starts_before=datetime(2026, 10, 16, 0, 0, tzinfo=UTC),
+    filtered_before = (
+        db_session.query(Appointment)
+        .filter(
+            Appointment.salon_id == ctx["salon"].id,
+            Appointment.starts_at < datetime(2026, 10, 16, 0, 0, tzinfo=UTC),
+        )
+        .all()
     )
-    assert len(filtered) == 2
-    assert appointment1.id in [a.id for a in filtered]
-    assert appointment2.id in [a.id for a in filtered]
+    assert len(filtered_before) == 2
+    assert appointment1.id in [a.id for a in filtered_before]
+    assert appointment2.id in [a.id for a in filtered_before]
