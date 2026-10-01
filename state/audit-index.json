@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T11:21:24.718827+00:00",
+  "generated_at": "2026-10-01T11:21:56.878017+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -10,7 +10,7 @@
       "state": "FINAL_PASS",
       "created_at": "2026-10-01T07:10:23.911935+00:00",
       "started_at": "2026-10-01T08:53:35.497067+00:00",
-      "finished_at": "2026-10-01T11:21:06.227294+00:00",
+      "finished_at": "2026-10-01T11:21:36.812190+00:00",
       "attempts": 1,
       "authoritative_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
       "last_error": null,
@@ -35,14 +35,14 @@
       "target_agent": "auditor",
       "phase": 2,
       "checkpoint": "P2-C",
-      "state": "RUNNING",
+      "state": "BLOCKED",
       "created_at": "2026-10-01T11:20:51.757102+00:00",
       "started_at": "2026-10-01T11:20:51.801629+00:00",
-      "finished_at": null,
+      "finished_at": "2026-10-01T11:21:47.854313+00:00",
       "attempts": 1,
       "authoritative_sha": "c21697776e6ce8752afe1168f47ed3a2f19c9b7a",
-      "last_error": null,
-      "result_path": null
+      "last_error": "Automated auditor could not produce a reliable PASS/REVISE verdict",
+      "result_path": "/home/ubuntu/salon-orchestrator/audit/codex/AUDIT-P2-C-c2169777.md"
     }
   ]
 }
