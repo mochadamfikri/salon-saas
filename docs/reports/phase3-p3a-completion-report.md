@@ -52,7 +52,10 @@ P3-A — Booking Domain & Lifecycle only.
 - Isolated clean-database migration regression: PASS.
 
 ## Commit
-- Implementation and documentation: pending final commit at report creation.
+- Implementation SHA: `79de221`
+- Documentation SHA: `139c9f1`
+- Formatting SHA: `0d69d20`
+- Branch HEAD: `0d69d20` (pushed to `origin/feature/phase-3-booking-engine`)
 
 ## Audit request
 P3-A is complete and ready for audit. It does not claim FINAL_PASS.
