@@ -35,6 +35,7 @@ SESSION_SECRET = os.environ.get("SALON_ADMIN_SESSION_SECRET", "change-me")
 ADMIN_USER = os.environ.get("SALON_ADMIN_USER", "owner")
 ADMIN_PASSWORD = os.environ.get("SALON_ADMIN_PASSWORD", "change-me")
 COOKIE = "salon_ops_session"
+PHASE_UPLOAD_ROOT = Path(os.environ.get("PHASE_UPLOAD_ROOT", "/home/ubuntu/salon-orchestrator-data/phase-uploads"))
 
 
 @app.on_event("startup")
@@ -624,7 +625,18 @@ def report_download(request: Request, report_id: str):
 @app.get("/api/phases")
 def phases(request: Request):
     require(request)
-    return query_all("SELECT * FROM phase_uploads ORDER BY created_at DESC")
+    rows = query_all("SELECT * FROM phase_uploads ORDER BY created_at DESC")
+    for row in rows:
+        try:
+            manifest = json.loads(row.get("manifest_json") or "{}")
+        except Exception:
+            manifest = {}
+        tasks = manifest.get("tasks", []) if isinstance(manifest, dict) else []
+        folder = Path(row.get("upload_path") or "")
+        spec = folder / str(row.get("master_spec_name") or "")
+        row["has_manifest"] = bool(tasks)
+        row["spec_present"] = spec.exists()
+    return rows
 
 
 def validate_zip(archive: zipfile.ZipFile) -> None:
@@ -644,7 +656,7 @@ async def phase_upload(request: Request, file: UploadFile = File(...)):
     if len(data) > 5_000_000:
         raise HTTPException(413, "upload too large")
     upload_id = "phase_" + uuid.uuid4().hex[:12]
-    folder = ROOT / "runtime/uploads" / upload_id
+    folder = PHASE_UPLOAD_ROOT / upload_id
     folder.mkdir(parents=True, exist_ok=True)
     manifest = {}
     try:
@@ -1055,6 +1067,9 @@ body{
 .worker-reason{margin-top:9px;padding-top:8px;border-top:1px solid #242c39;color:#b1bccb;font-size:12px;line-height:1.45}
 .filter-card{margin-bottom:10px}.filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.filter-grid label{font-size:11px;color:#94a3b8;display:flex;flex-direction:column;gap:6px}.filter-grid select{width:100%;background:#0d121a;color:#fff;border:1px solid #303746;border-radius:10px;padding:10px}.status-legend td:first-child{white-space:nowrap;font-weight:700}.task-empty{padding:14px 0;text-align:center}.mini-note{font-size:12px;color:#94a3b8;line-height:1.5;margin-top:6px}
 @media(max-width:700px){.stats-grid{grid-template-columns:1fr 1fr}.stats-grid .stat-card:first-child{grid-column:1/-1}.progress-columns{grid-template-columns:1fr}.filter-grid{grid-template-columns:1fr}.tasks-table td:nth-child(4),.tasks-table th:nth-child(4),.tasks-table td:nth-child(5),.tasks-table th:nth-child(5){display:none}.status-legend td:nth-child(2),.status-legend th:nth-child(2){display:table-cell!important}}
+/* IDSE_V81_NO_DOUBLE_STATUS_DOT */
+.pill:before{display:none!important}
+.pill{padding-left:9px!important}
 </style></head><body>
 <div class=top>
 <div class=brandbar>
@@ -1134,7 +1149,7 @@ function statusClass(raw){if(['FINAL_PASS','COMPLETED','RUNNING','AUDITING','ACT
 function populateFilter(id,values,labeler=(x)=>x){const el=document.getElementById(id);const current=el.value;const first=el.options[0]?.outerHTML||'<option value="">Semua</option>';el.innerHTML=first+[...new Set(values.filter(Boolean))].sort().map(v=>`<option value="${esc(v)}">${esc(labeler(v))}</option>`).join('');if([...el.options].some(o=>o.value===current))el.value=current}
 function renderTasks(){const agent=document.getElementById('taskAgentFilter')?.value||'';const state=document.getElementById('taskStatusFilter')?.value||'';const cp=document.getElementById('taskCheckpointFilter')?.value||'';const rows=allTasks.filter(x=>(!agent||x.target_agent===agent)&&(!state||x.state===state)&&(!cp||x.checkpoint===cp));taskrows.innerHTML=rows.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td><span class="pill ${statusClass(x.state)}">${esc(statusLabel(x.state))}</span></td><td>${esc(x.checkpoint||'-')}</td><td>${esc(x.attempts??0)}</td></tr>`).join('');document.getElementById('taskEmpty').classList.toggle('hidden',rows.length>0)}
 function checkpointCard(title,items,pct){return `<div class=card><b>${esc(title)}</b><div class=mini-note>${pct}% checkpoint Lulus Final</div><div class=bar><span style="width:${pct}%"></span></div><div class=checkpoint-list>${items.map(x=>`<div class=checkpoint-row><span>${esc(x.checkpoint)}</span><span class=status-text>${esc(statusLabel(x.state))}</span></div>`).join('')}</div></div>`}
-async function refresh(){const [p,w,t,n,r,ph,stats,tg]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases'),api('/api/project/stats'),api('/api/telegram-status')]);allTasks=t;projectSummary.innerHTML=`<div class=stat-card><div class=big>${esc(stats.overall_percent)}%</div><div class=small>Progress Phase ${esc(stats.current_phase)}</div><div class=bar><span style="width:${stats.overall_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.backend_percent)}%</div><div class=small>Backend</div><div class=bar><span style="width:${stats.backend_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.frontend_percent)}%</div><div class=small>Frontend</div><div class=bar><span style="width:${stats.frontend_percent}%"></span></div></div>`;project.innerHTML=`<b>Phase ${esc(stats.current_phase)} · ${esc(String(stats.phase_status).toUpperCase())}</b><div class=mini-note>Berikutnya: ${esc(stats.next_action)}</div><div class=mini-note>Backend HEAD ${esc(p.backend_git?.head_sha?.slice(0,8)||'-')} · Frontend HEAD ${esc(p.frontend_git?.head_sha?.slice(0,8)||'-')}</div>`;checkpointProgress.innerHTML=checkpointCard('🧠 Backend',stats.backend,stats.backend_percent)+checkpointCard('🖥️ Frontend',stats.frontend,stats.frontend_percent);phasePipeline.innerHTML=stats.phase_pipeline.map(x=>`<div class=phase-chip><b>Phase ${esc(x.phase)}</b><div class=mini-note>${esc(statusLabel(x.state))}</div></div>`).join('');const statWorkers=Object.fromEntries((stats.workers||[]).map(x=>[x.id,x]));workers.innerHTML=w.map(x=>{const sw=statWorkers[x.id]||{};return `<div class="card worker-card" onclick="openWorker('${x.id}')"><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${statusClass(x.status)}">${esc(statusLabel(x.status))}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div><div class=worker-reason><b>Keterangan:</b><br>${esc(sw.reason||x.current_activity||'Tidak ada keterangan.')}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="event.stopPropagation();act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Lanjutkan':'Jeda'}</button> <button onclick="event.stopPropagation();act('${x.id}','retry')">Ulangi</button></p>`:''}</div>`}).join('');telegramCard.innerHTML=`<b>${tg.configured?'✅ Telegram aktif':'⚠️ Telegram belum aktif'}</b><div class=mini-note>Status service: ${esc(statusLabel(tg.status))}</div><div class=mini-note>Event penting belum terkirim: ${esc(tg.pending_important_events)}</div><div class=mini-note>${esc(tg.last_log||'Belum ada log notifier.')}</div>${tg.configured?'<p><button onclick="testTelegram()">Kirim notifikasi tes</button></p>':'<div class=mini-note>Notifier memerlukan TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di environment service. Nilai rahasia tidak ditampilkan di panel.</div>'}`;populateFilter('taskAgentFilter',allTasks.map(x=>x.target_agent),x=>x.toUpperCase());populateFilter('taskStatusFilter',allTasks.map(x=>x.state),statusLabel);populateFilter('taskCheckpointFilter',allTasks.map(x=>x.checkpoint));renderTasks();statusLegendRows.innerHTML=(stats.status_legend||[]).map(x=>`<tr><td>${esc(x.icon+' '+x.label)}</td><td>${esc(x.detail)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class="card report-card" onclick="openReport('${x.id}')"><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}<br>Masuk panel: ${esc(fmtWIB(x.first_seen_at))}</p><button onclick="event.stopPropagation();openReport('${x.id}')">Lihat detail</button></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(statusLabel(x.status))}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Setujui / antrekan Phase</button></p>`:''}</div>`).join('')}
+async function refresh(){const [p,w,t,n,r,ph,stats,tg]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases'),api('/api/project/stats'),api('/api/telegram-status')]);allTasks=t;projectSummary.innerHTML=`<div class=stat-card><div class=big>${esc(stats.overall_percent)}%</div><div class=small>Progress Phase ${esc(stats.current_phase)}</div><div class=bar><span style="width:${stats.overall_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.backend_percent)}%</div><div class=small>Backend</div><div class=bar><span style="width:${stats.backend_percent}%"></span></div></div><div class=stat-card><div class=big>${esc(stats.frontend_percent)}%</div><div class=small>Frontend</div><div class=bar><span style="width:${stats.frontend_percent}%"></span></div></div>`;project.innerHTML=`<b>Phase ${esc(stats.current_phase)} · ${esc(String(stats.phase_status).toUpperCase())}</b><div class=mini-note>Berikutnya: ${esc(stats.next_action)}</div><div class=mini-note>Backend HEAD ${esc(p.backend_git?.head_sha?.slice(0,8)||'-')} · Frontend HEAD ${esc(p.frontend_git?.head_sha?.slice(0,8)||'-')}</div>`;checkpointProgress.innerHTML=checkpointCard('🧠 Backend',stats.backend,stats.backend_percent)+checkpointCard('🖥️ Frontend',stats.frontend,stats.frontend_percent);phasePipeline.innerHTML=stats.phase_pipeline.map(x=>`<div class=phase-chip><b>Phase ${esc(x.phase)}</b><div class=mini-note>${esc(statusLabel(x.state))}</div></div>`).join('');const statWorkers=Object.fromEntries((stats.workers||[]).map(x=>[x.id,x]));workers.innerHTML=w.map(x=>{const sw=statWorkers[x.id]||{};return `<div class="card worker-card" onclick="openWorker('${x.id}')"><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${statusClass(x.status)}">${esc(statusLabel(x.status))}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div><div class=worker-reason><b>Keterangan:</b><br>${esc(sw.reason||x.current_activity||'Tidak ada keterangan.')}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="event.stopPropagation();act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Lanjutkan':'Jeda'}</button> <button onclick="event.stopPropagation();act('${x.id}','retry')">Ulangi</button></p>`:''}</div>`}).join('');telegramCard.innerHTML=`<b>${tg.configured?'✅ Telegram aktif':'⚠️ Telegram belum aktif'}</b><div class=mini-note>Status service: ${esc(statusLabel(tg.status))}</div><div class=mini-note>Event penting belum terkirim: ${esc(tg.pending_important_events)}</div><div class=mini-note>${esc(tg.last_log||'Belum ada log notifier.')}</div>${tg.configured?'<p><button onclick="testTelegram()">Kirim notifikasi tes</button></p>':'<div class=mini-note>Notifier memerlukan TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di environment service. Nilai rahasia tidak ditampilkan di panel.</div>'}`;populateFilter('taskAgentFilter',allTasks.map(x=>x.target_agent),x=>x.toUpperCase());populateFilter('taskStatusFilter',allTasks.map(x=>x.state),statusLabel);populateFilter('taskCheckpointFilter',allTasks.map(x=>x.checkpoint));renderTasks();statusLegendRows.innerHTML=(stats.status_legend||[]).map(x=>`<tr><td>${esc(x.icon+' '+x.label)}</td><td>${esc(x.detail)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class="card report-card" onclick="openReport('${x.id}')"><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}<br>Masuk panel: ${esc(fmtWIB(x.first_seen_at))}</p><button onclick="event.stopPropagation();openReport('${x.id}')">Lihat detail</button></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(statusLabel(x.status))}<br><span class=muted>${esc(x.master_spec_name)}</span><div class=mini-note>${x.spec_present?'📄 Spec tersimpan':'⚠️ File spec perlu di-upload ulang'} · ${x.has_manifest?'🧩 Task manifest tersedia':'📝 Hanya spec / belum ada task manifest'}</div>${x.status==='VALIDATED'&&x.has_manifest&&x.spec_present?`<p><button onclick="activate('${x.id}')">Setujui / antrekan Phase</button></p>`:''}</div>`).join('')}
 async function testTelegram(){try{let x=await api('/api/telegram-test',{method:'POST'});alert(x.message||'Event tes dibuat');setTimeout(refresh,1200)}catch(e){alert(e.message)}}
 
 let detailTimer=null;
@@ -1174,26 +1189,26 @@ async function refreshWorkerDetail(){
   const d=await api(`/api/workers/${detailId}/detail`);
   const w=d.worker,t=d.task,p=d.progress_pct||0;
   const name=w.id==='auditor'?'AUTO AUDITOR':String(w.id).toUpperCase();
-  const events=(d.events||[]).map(e=>`<li><b>${esc(e.title)}</b><br><span class=muted>${esc(e.message)} · ${esc(fmtWIB(e.timestamp))}</span></li>`).join('');
+  const eventTitle=(v)=>String(v||'').replace(/^Audit BLOCKED:/,'⛔ Audit terblokir:').replace(/^Audit started:/,'🔍 Audit dimulai:').replace(/^Re-audit queued for/,'🔁 Audit ulang masuk antrean untuk').replace(/^Revision required:/,'🔁 Perlu revisi:').replace(/^Audit candidate PASS:/,'🟡 Kandidat lulus audit:'); const eventMessage=(v)=>String(v||'').replace('Audit evidence was insufficient or the auditor process failed. Open the audit report in Reports.','Evidence audit belum cukup atau proses auditor gagal. Buka report audit untuk detail.').replace('Auditing codex at','Mengaudit Codex pada').replace('queued automatically for codex','otomatis masuk antrean Codex'); const events=(d.events||[]).map(e=>`<li><b>${esc(eventTitle(e.title))}</b><br><span class=muted>${esc(eventMessage(e.message))} · ${esc(fmtWIB(e.timestamp))}</span></li>`).join('');
   showDetail(`
     <h2 style="margin-top:0">${esc(name)}</h2>
-    <div><span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(w.status)?'bad':['RECOVERING','PAUSED','WAITING_REVISION'].includes(w.status)?'warn':'good'}">${esc(w.status)}</span></div>
+    <div><span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(w.status)?'bad':['RECOVERING','PAUSED','WAITING_REVISION'].includes(w.status)?'warn':'good'}">${esc(statusLabel(w.status))}</span></div>
     <p class=muted>Estimasi progress operasional — bukan progress internal reasoning model.</p>
     <b>${p}%</b>
     <div class=progress-shell><div class=progress-fill style="width:${p}%"></div></div>
     <div class=detail-grid>
-      <div class=detail-item><div class=k>Stage</div><div class=v>${esc(w.current_stage||'-')}</div></div>
+      <div class=detail-item><div class=k>Tahap</div><div class=v>${esc(w.current_stage||'-')}</div></div>
       <div class=detail-item><div class=k>Aktivitas</div><div class=v>${esc(w.current_activity||'-')}</div></div>
       <div class=detail-item><div class=k>Task</div><div class=v>${esc(w.current_task_id||'-')}</div></div>
       <div class=detail-item><div class=k>Checkpoint</div><div class=v>${esc(w.checkpoint||'-')}</div></div>
       <div class=detail-item><div class=k>Branch</div><div class=v>${esc(w.branch||'-')}</div></div>
       <div class=detail-item><div class=k>HEAD</div><div class=v>${esc(w.head_sha||'-')}</div></div>
-      <div class=detail-item><div class=k>Started</div><div class=v>${esc(fmtWIB(w.task_started_at))}</div></div>
-      <div class=detail-item><div class=k>Elapsed</div><div class=v>${esc(durationSince(w.task_started_at))}</div></div>
-      <div class=detail-item><div class=k>Attempts</div><div class=v>${esc(t?.attempts??w.retry_attempt??0)}</div></div>
-      <div class=detail-item><div class=k>Heartbeat</div><div class=v>${esc(fmtWIB(w.last_heartbeat))}</div></div>
+      <div class=detail-item><div class=k>Mulai</div><div class=v>${esc(fmtWIB(w.task_started_at))}</div></div>
+      <div class=detail-item><div class=k>Durasi</div><div class=v>${esc(durationSince(w.task_started_at))}</div></div>
+      <div class=detail-item><div class=k>Percobaan</div><div class=v>${esc(t?.attempts??w.retry_attempt??0)}</div></div>
+      <div class=detail-item><div class=k>Detak terakhir</div><div class=v>${esc(fmtWIB(w.last_heartbeat))}</div></div>
     </div>
-    <h3>Recent activity</h3>
+    <h3>Aktivitas terbaru</h3>
     <ul class=activity-list>${events||'<li class=muted>Belum ada event.</li>'}</ul>
   `);
 }
@@ -1203,7 +1218,7 @@ async function openReport(id){
   if(detailTimer){clearInterval(detailTimer);detailTimer=null}
   const d=await api(`/api/reports/${id}`);
   showDetail(`
-    <h2 style="margin-top:0">Report Detail</h2>
+    <h2 style="margin-top:0">Detail Report</h2>
     <div class=detail-grid>
       <div class=detail-item><div class=k>Nama</div><div class=v>${esc(d.name)}</div></div>
       <div class=detail-item><div class=k>Agent</div><div class=v>${esc(d.agent)}</div></div>
@@ -1212,7 +1227,7 @@ async function openReport(id){
       <div class=detail-item><div class=k>Masuk panel</div><div class=v>${esc(fmtWIB(d.first_seen_at))}</div></div>
       <div class=detail-item><div class=k>Terakhir berubah</div><div class=v>${esc(fmtWIB(d.modified_at))}</div></div>
     </div>
-    <p><a href="${esc(d.download_url)}"><button>Download report</button></a></p>
+    <p><a href="${esc(d.download_url)}"><button>Unduh report</button></a></p>
     <h3>Isi report</h3>
     <pre class=report-body>${esc(d.content)}${d.truncated?'\\n\\n[Preview dipotong. Download untuk file lengkap.]':''}</pre>
   `);
@@ -1220,7 +1235,7 @@ async function openReport(id){
 
 async function act(w,a){try{await api(`/api/workers/${w}/${a}`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 async function readAll(){await api('/api/notifications/read-all',{method:'POST'});refresh()}
-async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`Validated Phase ${x.phase}: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}
+async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`✅ Phase ${x.phase} tervalidasi: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}
 async function activate(id){if(!confirm('Activate phase ini dan queue task manifest yang valid?'))return;try{await api(`/api/phases/${id}/activate`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 let lastScroll=0;
 addEventListener('scroll',()=>{lastScroll=Date.now()},{passive:true});

@@ -50,6 +50,30 @@ def scan(agent: str):
     return found
 
 
+def delivery_check(workspace: Path, before: dict, after: dict) -> tuple[bool, str]:
+    before_sha = before.get("head_sha")
+    after_sha = after.get("head_sha")
+    branch = after.get("branch")
+    if not after_sha or not branch:
+        return False, "HEAD/branch tidak dapat diverifikasi"
+    if before_sha == after_sha:
+        return False, "agent selesai tetapi tidak menghasilkan commit baru"
+    if not after.get("working_tree_clean"):
+        return False, "working tree masih kotor"
+    try:
+        remote = subprocess.check_output(
+            ["git", "-C", str(workspace), "ls-remote", "origin", f"refs/heads/{branch}"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        remote_sha = remote.split()[0] if remote else ""
+    except Exception:
+        return False, "remote branch tidak dapat diverifikasi"
+    if remote_sha != after_sha:
+        return False, f"commit {after_sha[:8]} belum ter-push ke origin/{branch}"
+    return True, "commit baru bersih dan sudah ter-push"
+
+
 def run_task(agent: str, path: Path, row: dict) -> None:
     workspace = BACKEND_WORKSPACE if agent == "hermes" else FRONTEND_WORKSPACE
     before = git_info(workspace)
@@ -146,10 +170,15 @@ def run_task(agent: str, path: Path, row: dict) -> None:
 
     after = git_info(workspace)
     con = db()
+    delivered = False
+    delivery_reason = ""
     if returncode == 0:
+        delivered, delivery_reason = delivery_check(workspace, before, after)
+
+    if returncode == 0 and delivered:
         con.execute(
-            "UPDATE tasks SET state='READY_FOR_AUDIT',finished_at=?,result_path=?,last_error=NULL WHERE id=?",
-            (now_iso(), str(result_path), row["id"]),
+            "UPDATE tasks SET state='READY_FOR_AUDIT',finished_at=?,result_path=?,last_error=NULL,authoritative_sha=? WHERE id=?",
+            (now_iso(), str(result_path), after["head_sha"], row["id"]),
         )
         con.commit()
         con.close()
@@ -159,11 +188,11 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             current_task_id=row["id"],
             head_sha=after["head_sha"],
             branch=after["branch"],
-            working_tree_clean=1 if after["working_tree_clean"] else 0,
+            working_tree_clean=1,
             last_exit_code=0,
             last_successful_checkpoint=row["checkpoint"],
-            current_stage="Ready for audit",
-            current_activity="Task selesai; menunggu audit",
+            current_stage="Siap diaudit",
+            current_activity="Commit baru sudah ter-push; menunggu audit",
             progress_pct=100,
             activity_updated_at=now_iso(),
         )
@@ -171,16 +200,20 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             agent,
             "task.ready_for_audit",
             "SUCCESS",
-            f"{agent.title()} ready for audit",
-            f"{row['id']} finished. HEAD {after['head_sha']}",
+            f"{agent.title()} siap diaudit",
+            f"{row['id']} selesai dan ter-push. HEAD {after['head_sha'][:8]}",
             phase=row["phase"],
             checkpoint=row["checkpoint"],
             task_id=row["id"],
-            metadata={"head_sha": after["head_sha"], "clean": after["working_tree_clean"]},
+            metadata={"head_sha": after["head_sha"], "clean": True},
         )
         return
 
-    err = f"exit={returncode}; {output[-1500:]}"
+    if returncode == 0:
+        returncode = 86
+        err = f"delivery-check gagal: {delivery_reason}"
+    else:
+        err = f"exit={returncode}; {output[-1500:]}"
     if attempts < MAX_ATTEMPTS:
         con.execute(
             "UPDATE tasks SET state='REVISE',last_error=? WHERE id=?",
