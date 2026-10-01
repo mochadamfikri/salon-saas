@@ -34,15 +34,36 @@ def git(*args: str, check: bool = True) -> str:
     return (p.stdout or "").strip()
 
 def changed_paths() -> list[str]:
-    out = git("status","--porcelain")
+    # Do not use git() here: git() strips leading whitespace, while
+    # porcelain status uses the first two columns as significant XY status.
+    p = subprocess.run(
+        ["git", "-C", str(FRONT), "status", "--porcelain=v1", "-z"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env(),
+    )
+    if p.returncode != 0:
+        raise RuntimeError(p.stdout.decode(errors="replace")[-1800:])
+
+    entries = p.stdout.decode(errors="surrogateescape").split("\0")
     result = []
-    for line in out.splitlines():
-        if not line.strip():
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        i += 1
+        if not entry:
             continue
-        path = line[3:].strip()
-        if " -> " in path:
-            path = path.split(" -> ",1)[1]
+
+        path = entry[3:]
+
+        # In -z porcelain format, rename/copy paths are separate NUL
+        # records. The destination is the path in the status record.
+        if len(entry) >= 2 and ("R" in entry[:2] or "C" in entry[:2]):
+            if i < len(entries) and entries[i]:
+                i += 1
+
         result.append(path)
+
     return result
 
 def gate(name: str, cmd: list[str], timeout: int) -> tuple[bool, str]:
