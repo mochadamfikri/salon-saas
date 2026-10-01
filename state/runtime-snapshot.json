@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T10:24:05.034334+00:00",
+  "generated_at": "2026-10-01T10:24:37.247211+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:23:59.192162+00:00",
+      "last_heartbeat": "2026-10-01T10:24:29.202886+00:00",
       "current_stage": "Blocked",
       "current_activity": "Audit tidak dapat diselesaikan",
       "progress_pct": 100,
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:23:55.170929+00:00",
+      "last_heartbeat": "2026-10-01T10:24:25.185231+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T10:23:39.967648+00:00",
+      "last_heartbeat": "2026-10-01T10:24:09.981662+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T10:24:03.664133+00:00",
+      "last_heartbeat": "2026-10-01T10:24:33.682454+00:00",
       "current_stage": "Telegram belum dikonfigurasi",
       "current_activity": "Menunggu TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di environment service",
       "progress_pct": 0,
