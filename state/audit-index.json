@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T10:27:18.649786+00:00",
+  "generated_at": "2026-10-01T10:27:29.616086+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -10,7 +10,7 @@
       "state": "FINAL_PASS",
       "created_at": "2026-10-01T07:10:23.911935+00:00",
       "started_at": "2026-10-01T08:53:35.497067+00:00",
-      "finished_at": "2026-10-01T10:26:48.615523+00:00",
+      "finished_at": "2026-10-01T10:27:28.994344+00:00",
       "attempts": 1,
       "authoritative_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
       "last_error": null,
@@ -35,13 +35,13 @@
       "target_agent": "auditor",
       "phase": 2,
       "checkpoint": "P2-C",
-      "state": "BLOCKED",
+      "state": "WAITING_DEPENDENCY",
       "created_at": "2026-10-01T09:43:19.726066+00:00",
-      "started_at": "2026-10-01T09:43:49.305600+00:00",
-      "finished_at": "2026-10-01T10:06:28.818582+00:00",
-      "attempts": 8,
+      "started_at": null,
+      "finished_at": null,
+      "attempts": 0,
       "authoritative_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_error": "Automated auditor could not produce a reliable PASS/REVISE verdict",
+      "last_error": "Menunggu implementasi P2-C menghasilkan commit baru yang ter-push",
       "result_path": "/home/ubuntu/salon-orchestrator/audit/codex/AUDIT-P2-C-a16323e7.md"
     }
   ]
