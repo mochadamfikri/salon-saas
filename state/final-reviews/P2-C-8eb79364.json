@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "checkpoint": "P2-C",
+  "phase": 2,
+  "source_agent": "codex",
+  "authoritative_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
+  "audit_task_id": "AUDIT-FE-P2-C",
+  "auto_verdict": "PASS_CANDIDATE",
+  "verdict": "FINAL_PASS",
+  "reviewer": "ChatGPT",
+  "reviewed_at": "2026-10-01T13:12:30+00:00",
+  "summary": "Independent final review found Frontend P2-C Staff Profile and Staff-Service Assignment compliant with the approved Phase 2 contract. Tenant-scoped BFF routing, server-side token handling, role-aware UI behavior, immutable membership_id, no hard-delete scope, deterministic 422 handling for malformed JSON, 404/409/422 semantics, and staff-service assignment flows were reviewed. Trusted-host gates passed: Vitest 27 files / 193 tests, TypeScript, ESLint, production build, and diff check. No unresolved findings remain.",
+  "findings": []
+}
