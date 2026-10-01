@@ -16,7 +16,6 @@ def _env() -> dict[str, str]:
     env = os.environ.copy()
     env["PATH"] = str(NODE_BIN_DIR) + ":" + env.get("PATH", "")
     env["NEXT_TELEMETRY_DISABLED"] = "1"
-    env["NODE_ENV"] = "development"
     env["npm_config_include"] = "dev"
     env.pop("npm_config_omit", None)
     env.pop("NPM_CONFIG_OMIT", None)
