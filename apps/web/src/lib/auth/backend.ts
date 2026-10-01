@@ -22,6 +22,8 @@ import type {
   BackendStaffProfile,
   BackendStaffProfileUpdateRequest,
   BackendStaffAssignment,
+  BackendAvailability,
+  BackendAvailabilityWrite,
   BackendTokenPair,
   BackendUser,
 } from "./contracts";
@@ -292,6 +294,19 @@ export class BackendClient {
   }
   unassignStaffService(accessToken: string, salonId: string, id: string, serviceId: string): Promise<BackendResult<null>> {
     return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(id)}/services/${encodeURIComponent(serviceId)}`, { method: "DELETE", accessToken });
+  }
+
+  listAvailability(accessToken: string, salonId: string, profileId: string): Promise<BackendResult<BackendAvailability[]>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability`, { method: "GET", accessToken });
+  }
+  createAvailability(accessToken: string, salonId: string, profileId: string, body: BackendAvailabilityWrite): Promise<BackendResult<BackendAvailability>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability`, { method: "POST", body, accessToken });
+  }
+  updateAvailability(accessToken: string, salonId: string, profileId: string, availabilityId: string, body: BackendAvailabilityWrite): Promise<BackendResult<BackendAvailability>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability/${encodeURIComponent(availabilityId)}`, { method: "PATCH", body, accessToken });
+  }
+  deleteAvailability(accessToken: string, salonId: string, profileId: string, availabilityId: string): Promise<BackendResult<null>> {
+    return this.request(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability/${encodeURIComponent(availabilityId)}`, { method: "DELETE", accessToken });
   }
 
   /**

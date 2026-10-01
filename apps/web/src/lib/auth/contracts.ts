@@ -123,6 +123,8 @@ export interface BackendStaffProfileUpdateRequest {
   display_name?: string | null; phone?: string | null; bio?: string | null; photo_url?: string | null;
 }
 export interface BackendStaffAssignment { id: string; staff_profile_id: string; salon_service_id: string; created_at: string; updated_at: string }
+export interface BackendAvailability { id: string; staff_profile_id: string; day_of_week: number; start_time: string; end_time: string; is_available: boolean; created_at: string; updated_at: string }
+export interface BackendAvailabilityWrite { day_of_week?: number; start_time?: string; end_time?: string }
 
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
