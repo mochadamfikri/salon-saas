@@ -15,9 +15,17 @@ import type {
   BackendRegisterRequest,
   BackendSalon,
   BackendSalonCreateRequest,
+  BackendSalonCustomer,
+  BackendSalonCustomerCreateRequest,
+  BackendSalonCustomerUpdateRequest,
   BackendSalonService,
   BackendSalonServiceCreateRequest,
   BackendSalonServiceUpdateRequest,
+  BackendStaffProfile,
+  BackendStaffProfileUpdateRequest,
+  BackendStaffServiceAssignment,
+  BackendStaffAvailability,
+  BackendStaffAvailabilityInput,
   BackendTokenPair,
   BackendUser,
 } from "./contracts";
@@ -231,6 +239,56 @@ export class BackendClient {
       method: "GET",
       accessToken,
     });
+  }
+
+  listCustomers(accessToken: string, salonId: string) {
+    return this.request<BackendSalonCustomer[]>(`/salons/${encodeURIComponent(salonId)}/customers`, { method: "GET", accessToken });
+  }
+  createCustomer(accessToken: string, salonId: string, body: BackendSalonCustomerCreateRequest) {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers`, { method: "POST", accessToken, body });
+  }
+  getCustomer(accessToken: string, salonId: string, customerId: string) {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers/${encodeURIComponent(customerId)}`, { method: "GET", accessToken });
+  }
+  updateCustomer(accessToken: string, salonId: string, customerId: string, body: BackendSalonCustomerUpdateRequest) {
+    return this.request<BackendSalonCustomer>(`/salons/${encodeURIComponent(salonId)}/customers/${encodeURIComponent(customerId)}`, { method: "PATCH", accessToken, body });
+  }
+
+  listStaffProfiles(accessToken: string, salonId: string) {
+    return this.request<BackendStaffProfile[]>(`/salons/${encodeURIComponent(salonId)}/staff-profiles`, { method: "GET", accessToken });
+  }
+  createStaffProfile(accessToken: string, salonId: string, membershipId: string) {
+    return this.request<BackendStaffProfile>(`/salons/${encodeURIComponent(salonId)}/staff-profiles`, { method: "POST", accessToken, body: { membership_id: membershipId } });
+  }
+  updateStaffProfile(accessToken: string, salonId: string, profileId: string, body: BackendStaffProfileUpdateRequest) {
+    return this.request<BackendStaffProfile>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}`, { method: "PATCH", accessToken, body });
+  }
+  toggleStaffBookable(accessToken: string, salonId: string, profileId: string, isBookable: boolean) {
+    return this.request<BackendStaffProfile>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/toggle-bookable`, { method: "POST", accessToken, body: { is_bookable: isBookable } });
+  }
+  listStaffAssignments(accessToken: string, salonId: string, profileId: string) {
+    return this.request<BackendStaffServiceAssignment[]>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/services`, { method: "GET", accessToken });
+  }
+  assignStaffService(accessToken: string, salonId: string, profileId: string, serviceId: string) {
+    return this.request<BackendStaffServiceAssignment>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/services/${encodeURIComponent(serviceId)}`, { method: "POST", accessToken });
+  }
+  unassignStaffService(accessToken: string, salonId: string, profileId: string, serviceId: string) {
+    return this.request<void>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/services/${encodeURIComponent(serviceId)}`, { method: "DELETE", accessToken });
+  }
+  listStaffAvailability(accessToken: string, salonId: string, profileId: string) {
+    return this.request<BackendStaffAvailability[]>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability`, { method: "GET", accessToken });
+  }
+  createStaffAvailability(accessToken: string, salonId: string, profileId: string, body: BackendStaffAvailabilityInput) {
+    return this.request<BackendStaffAvailability>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability`, { method: "POST", accessToken, body });
+  }
+  updateStaffAvailability(accessToken: string, salonId: string, profileId: string, availabilityId: string, body: BackendStaffAvailabilityInput) {
+    return this.request<BackendStaffAvailability>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability/${encodeURIComponent(availabilityId)}`, { method: "PATCH", accessToken, body });
+  }
+  deleteStaffAvailability(accessToken: string, salonId: string, profileId: string, availabilityId: string) {
+    return this.request<void>(`/salons/${encodeURIComponent(salonId)}/staff-profiles/${encodeURIComponent(profileId)}/availability/${encodeURIComponent(availabilityId)}`, { method: "DELETE", accessToken });
+  }
+  listMembers(accessToken: string, salonId: string) {
+    return this.request<Array<{ id: string; role: string; status: string; user: { id: string; email: string } }>>(`/salons/${encodeURIComponent(salonId)}/members`, { method: "GET", accessToken });
   }
 
   getService(accessToken: string, salonId: string, serviceId: string): Promise<BackendResult<BackendSalonService>> {

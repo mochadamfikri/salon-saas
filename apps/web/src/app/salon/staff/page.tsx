@@ -1,0 +1,16 @@
+import type { Metadata } from "next";
+import StaffProfiles from "@/components/salon/StaffProfiles";
+import { getMySalons, requireUser } from "@/lib/auth/server-session";
+
+export const metadata: Metadata = { title: "Profil Staf — Salon SaaS" };
+export const dynamic = "force-dynamic";
+type Props = { searchParams: Promise<{ salon?: string }> };
+
+export default async function SalonStaffPage({ searchParams }: Props) {
+  await requireUser("/salon/staff");
+  const memberships = (await getMySalons()) ?? [];
+  const { salon: requestedSalonId } = await searchParams;
+  const membership = memberships.find((item) => item.salon.id === requestedSalonId) ?? memberships[0];
+  if (!membership) return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="text-2xl font-semibold">Profil Staf</h1><p className="mt-3 text-sm text-zinc-600">Anda belum memiliki keanggotaan salon.</p></main>;
+  return <main><div className="border-b border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">{membership.salon.name} · Peran: {membership.role}</div><StaffProfiles salonId={membership.salon.id} membershipId={membership.id} role={membership.role} /></main>;
+}

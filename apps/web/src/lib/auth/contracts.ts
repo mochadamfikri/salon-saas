@@ -115,6 +115,35 @@ export interface BackendSalonServiceUpdateRequest {
   currency?: string;
 }
 
+export interface BackendStaffProfile {
+  id: string; membership_id: string; display_name: string | null; phone: string | null;
+  bio: string | null; photo_url: string | null; is_bookable: boolean; created_at: string; updated_at: string;
+}
+export interface BackendStaffProfileUpdateRequest {
+  display_name?: string | null; phone?: string | null; bio?: string | null; photo_url?: string | null;
+}
+export interface BackendStaffServiceAssignment {
+  id: string; staff_profile_id: string; salon_service_id: string; created_at: string; updated_at: string;
+}
+export interface BackendStaffAvailability {
+  id: string; staff_profile_id: string; day_of_week: number; start_time: string; end_time: string;
+  is_available: boolean; created_at: string; updated_at: string;
+}
+export interface BackendStaffAvailabilityInput {
+  day_of_week: number; start_time: string; end_time: string; is_available?: boolean;
+}
+
+export interface BackendSalonCustomer {
+  id: string; salon_id: string; full_name: string; email: string | null; phone: string | null;
+  notes: string | null; created_at: string; updated_at: string;
+}
+export interface BackendSalonCustomerCreateRequest {
+  full_name: string; email?: string | null; phone?: string | null; notes?: string | null;
+}
+export interface BackendSalonCustomerUpdateRequest {
+  full_name?: string; email?: string | null; phone?: string | null; notes?: string | null;
+}
+
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
  * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).
