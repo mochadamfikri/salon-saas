@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T14:05:26.063270+00:00",
+  "generated_at": "2026-10-01T14:05:58.411043+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
-      "last_heartbeat": "2026-10-01T14:05:12.620154+00:00",
+      "last_heartbeat": "2026-10-01T14:05:42.631425+00:00",
       "current_stage": "Audit complete",
       "current_activity": "Pre-audit selesai; menunggu final review",
       "progress_pct": 100,
@@ -26,7 +26,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "8eb7936449e2cd1f5f4b0bbcbdb5a7b5dbe1178f",
-      "last_heartbeat": "2026-10-01T14:05:18.075188+00:00",
+      "last_heartbeat": "2026-10-01T14:05:48.091081+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T14:05:16.486122+00:00",
+      "last_heartbeat": "2026-10-01T14:05:46.500912+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T14:05:21.912287+00:00",
+      "last_heartbeat": "2026-10-01T14:05:51.946458+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
