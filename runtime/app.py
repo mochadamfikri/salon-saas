@@ -460,7 +460,6 @@ tbody tr{transition:background .18s ease}tbody tr:hover{background:rgba(124,140,
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media(max-width:640px){.top>b{font-size:12px}.top>b:before{width:34px;height:34px}.wrap>div:first-child{width:100%;overflow-x:auto;flex-wrap:nowrap}.wrap>div:first-child button{flex:0 0 auto}}
 
-<style>
 
 /* IDSE_MOBILE_PERFORMANCE_V1 */
 
@@ -521,8 +520,189 @@ tbody tr{transition:background .18s ease}tbody tr:hover{background:rgba(124,140,
   }
 }
 
-</style></style></head><body>
-<div class=top><b>IDSE NETWORK DEVELOPING PANEL</b><div><button onclick="showTab('notifications')">🔔 <span id=unread>0</span></button> <form style=display:inline method=post action=/logout><button>Keluar</button></form></div></div>
+
+/* IDSE_LIGHTWEIGHT_V2 */
+
+body{
+  background:#080b11 !important;
+  background-image:none !important;
+}
+
+.top{
+  position:relative !important;
+  min-height:70px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+  padding:13px 18px !important;
+  background:#0c1017 !important;
+  box-shadow:none !important;
+}
+
+.brandbar{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  min-width:0;
+}
+
+.brandicon{
+  width:40px;
+  height:40px;
+  flex:0 0 40px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  font-weight:800;
+  font-size:13px;
+  background:#6675e8;
+  color:#fff;
+}
+
+.brandlabels{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+}
+
+.brandlabels strong{
+  font-size:14px;
+  line-height:1.1;
+  white-space:nowrap;
+}
+
+.brandlabels span{
+  margin-top:4px;
+  font-size:10px;
+  color:#8793a6;
+  letter-spacing:.13em;
+}
+
+.topactions{
+  margin-left:auto;
+  display:flex !important;
+  align-items:center !important;
+  gap:7px !important;
+  flex:0 0 auto;
+}
+
+.topactions form{
+  margin:0;
+  display:block !important;
+}
+
+.bellbtn,
+.logoutbtn{
+  height:40px;
+  margin:0 !important;
+  padding:0 12px !important;
+  border-radius:11px !important;
+  background:#151a23 !important;
+  border:1px solid #2a3240 !important;
+  box-shadow:none !important;
+}
+
+.bellbtn{
+  min-width:54px;
+}
+
+.logoutbtn{
+  min-width:68px;
+}
+
+.top>b:before{
+  display:none !important;
+}
+
+.wrap>div:first-child{
+  background:#0d121a !important;
+  border:1px solid #202837 !important;
+  backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+
+.card,
+.card:hover{
+  background:#111722 !important;
+  background-image:none !important;
+  box-shadow:none !important;
+  transform:none !important;
+  transition:none !important;
+}
+
+.card{
+  contain:layout paint;
+}
+
+.pill.good:before{
+  animation:none !important;
+  box-shadow:none !important;
+}
+
+.section:not(.hidden){
+  animation:none !important;
+}
+
+#notifs .card,
+#workers .card{
+  content-visibility:visible !important;
+  contain-intrinsic-size:auto !important;
+}
+
+@media(pointer:coarse){
+  *,
+  *::before,
+  *::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+
+@media(max-width:640px){
+  .top{
+    padding:11px 12px !important;
+  }
+
+  .brandicon{
+    width:36px;
+    height:36px;
+    flex-basis:36px;
+  }
+
+  .brandlabels strong{
+    font-size:12px;
+  }
+
+  .brandlabels span{
+    font-size:9px;
+  }
+
+  .bellbtn{
+    min-width:46px;
+    padding:0 8px !important;
+  }
+
+  .logoutbtn{
+    min-width:58px;
+    padding:0 9px !important;
+  }
+}
+
+</style></head><body>
+<div class=top>
+<div class=brandbar>
+  <div class=brandicon>ID</div>
+  <div class=brandlabels>
+    <strong>IDSE NETWORK</strong>
+    <span>DEVELOPING PANEL</span>
+  </div>
+</div>
+<div class=topactions>
+  <button class=bellbtn onclick="showTab('notifications')">🔔 <span id=unread>0</span></button>
+  <form method=post action=/logout><button class=logoutbtn>Keluar</button></form>
+</div>
+</div>
 <div class=wrap><div><button onclick="showTab('dashboard')">Dashboard</button> <button onclick="showTab('tasks')">Tasks</button> <button onclick="showTab('reports')">Reports</button> <button onclick="showTab('phases')">Phases</button> <button onclick="showTab('notifications')">Notif</button></div>
 <section id=dashboard class=section><h2>Workers</h2><div id=workers class=grid></div><h2>Project</h2><div id=project class=card></div></section>
 <section id=tasks class="section hidden"><h2>Queue / Tasks</h2><div class=card><table><thead><tr><th>ID</th><th>Agent</th><th>Status</th><th>Checkpoint</th><th>Attempts</th></tr></thead><tbody id=taskrows></tbody></table></div></section>
@@ -552,10 +732,15 @@ function fmtWIB(v){
 }
 
 function showTab(id){document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
-async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,80).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,60).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
 async function act(w,a){try{await api(`/api/workers/${w}/${a}`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 async function readAll(){await api('/api/notifications/read-all',{method:'POST'});refresh()}
 async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`Validated Phase ${x.phase}: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}
 async function activate(id){if(!confirm('Activate phase ini dan queue task manifest yang valid?'))return;try{await api(`/api/phases/${id}/activate`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
-refresh();setInterval(refresh,10000);
+let lastScroll=0;
+addEventListener('scroll',()=>{lastScroll=Date.now()},{passive:true});
+refresh();
+setInterval(()=>{
+  if(!document.hidden && Date.now()-lastScroll>2500) refresh()
+},15000);
 </script></body></html>"""
