@@ -335,15 +335,31 @@ def dispatch_once() -> None:
     for index, item in enumerate(CHECKPOINTS):
         eligible = backend_ready(item) and previous_frontend_final(index)
 
-        if eligible and not get_task(item["frontend_task"]):
+        impl = get_task(item["frontend_task"])
+        impl_path_missing = bool(
+            impl
+            and impl["state"] in ("QUEUED", "WAITING_DEPENDENCY", "REVISE")
+            and not Path(impl["task_path"]).exists()
+        )
+
+        # Self-heal SQLite/file drift: a queued DB task is not executable if
+        # the inbox markdown was lost by maintenance/stash/cleanup.
+        if eligible and (not impl or impl_path_missing):
             create_frontend_task(item)
 
         impl = get_task(item["frontend_task"])
+        audit = get_task(item["frontend_audit"])
+        audit_path_missing = bool(
+            audit
+            and audit["state"] in ("QUEUED", "WAITING_DEPENDENCY")
+            and not Path(audit["task_path"]).exists()
+        )
+
         if (
             eligible
             and impl
             and impl["state"] == "READY_FOR_AUDIT"
-            and not get_task(item["frontend_audit"])
+            and (not audit or audit_path_missing)
         ):
             create_frontend_audit(item, impl)
 
