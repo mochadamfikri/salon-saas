@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T08:53:36.334741+00:00",
+  "generated_at": "2026-10-01T08:54:08.479588+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T08:53:35.522257+00:00",
-      "current_stage": "Preparing audit",
-      "current_activity": "Menyiapkan worktree audit",
-      "progress_pct": 10,
+      "last_heartbeat": "2026-10-01T08:53:36.471976+00:00",
+      "current_stage": "Trusted verification",
+      "current_activity": "Menjalankan pytest dan quality gates di host terisolasi",
+      "progress_pct": 35,
       "last_successful_checkpoint": null
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": null,
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T08:53:07.230947+00:00",
+      "last_heartbeat": "2026-10-01T08:54:07.269799+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T08:53:07.222548+00:00",
+      "last_heartbeat": "2026-10-01T08:54:07.262825+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T08:53:24.124779+00:00",
+      "last_heartbeat": "2026-10-01T08:53:54.145935+00:00",
       "current_stage": null,
       "current_activity": null,
       "progress_pct": 0,
