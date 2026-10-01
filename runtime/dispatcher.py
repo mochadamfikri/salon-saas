@@ -210,10 +210,13 @@ MANDATORY:
 - Browser -> Next.js BFF -> FastAPI; keep tokens server-side/HttpOnly.
 - Preserve Phase 1 and P2-B audited behavior.
 - No merge/deploy/force-push/backend edits/later-phase scope.
-- Run relevant Vitest + full frontend tests, TypeScript, ESLint, and production build.
-- Commit and push the frontend branch.
+- Implement only this checkpoint and update its tests/report.
+- Run targeted checks feasible inside the Codex sandbox.
+- Do NOT block handoff solely on sandbox Git/build/worker restrictions.
+- Leave completed implementation in the working tree; the trusted host worker owns full gates, commit, push and READY_FOR_AUDIT.
+- Do NOT start the next checkpoint.
 - Write completion report exactly at {item['report']}.
-- Exit successfully only when READY_FOR_AUDIT.
+- Exit successfully when implementation is ready for trusted-host verification.
 {checkpoint_details(item['checkpoint'])}
 """
     path = ROOT / "inbox/codex" / f"{item['frontend_task']}.md"

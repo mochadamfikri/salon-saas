@@ -22,6 +22,7 @@ from common import (
 )
 
 from progress import run_streamed
+from frontend_publish import publish_frontend_worktree
 
 POLL = int(os.environ.get("WORKER_POLL_SECONDS", "30"))
 MAX_ATTEMPTS = int(os.environ.get("WORKER_MAX_ATTEMPTS", "3"))
@@ -167,6 +168,19 @@ def run_task(agent: str, path: Path, row: dict) -> None:
 
     summary = output[-2000:] if output else f"process exited {returncode}"
     log(agent, summary.replace("\n", " | "))
+
+    if agent == "codex":
+        publication = publish_frontend_worktree(
+            task_id=row["id"],
+            checkpoint=row["checkpoint"],
+            before_sha=before.get("head_sha"),
+        )
+        log(agent, "HOST PUBLISH " + str(publication).replace("\n", " | ")[-2400:])
+        if publication.get("ok"):
+            returncode = 0
+        else:
+            returncode = 86
+            output = (output or "") + "\nHOST_PUBLISH_FAILURE: " + str(publication.get("reason") or "unknown")
 
     after = git_info(workspace)
     con = db()

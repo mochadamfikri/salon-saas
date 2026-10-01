@@ -61,3 +61,16 @@ For every frontend checkpoint:
 - The trusted host verifier then runs full Vitest, TypeScript, ESLint, and production build against the immutable pushed SHA.
 - A real deterministic source, TypeScript, ESLint, or test failure must still be fixed before handoff.
 - Never mix later checkpoint work into the current checkpoint commit.
+
+
+## Controlled Handoff — Authoritative Rule
+
+Codex is the frontend code author, not the publisher.
+
+Codex MUST implement only the assigned checkpoint, update its tests/report, run checks feasible inside its sandbox, fix deterministic code errors, leave completed changes in the frontend working tree, and exit successfully when ready for host verification.
+
+Codex MUST NOT wait for permission to commit, refuse handoff only because sandbox Git/build/worker restrictions exist, start later checkpoints, edit backend-owned files, merge, deploy, force-push, or invent backend contracts.
+
+The frontend worker host is authoritative for full Vitest, TypeScript, ESLint, production build, diff check, scope check, commit, push, and READY_FOR_AUDIT.
+
+A deterministic host failure blocks once with the concrete failing gate; it is not blindly retried.
