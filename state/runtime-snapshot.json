@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T10:04:38.928298+00:00",
+  "generated_at": "2026-10-01T10:05:11.190656+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,10 +11,10 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:04:37.977061+00:00",
-      "current_stage": "Reporting",
-      "current_activity": "Menyiapkan report / handoff",
-      "progress_pct": 96,
+      "last_heartbeat": "2026-10-01T10:05:08.881564+00:00",
+      "current_stage": "Testing",
+      "current_activity": "Menjalankan test",
+      "progress_pct": 70,
       "last_successful_checkpoint": "P2-E"
     },
     {
@@ -26,7 +26,7 @@
       "checkpoint": "P2-E",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:04:38.863955+00:00",
+      "last_heartbeat": "2026-10-01T10:05:10.516077+00:00",
       "current_stage": "Testing",
       "current_activity": "Menjalankan test",
       "progress_pct": 96,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T10:04:09.433010+00:00",
+      "last_heartbeat": "2026-10-01T10:05:09.466270+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T10:04:26.750997+00:00",
+      "last_heartbeat": "2026-10-01T10:04:56.769328+00:00",
       "current_stage": null,
       "current_activity": null,
       "progress_pct": 0,
