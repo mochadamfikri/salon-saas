@@ -89,7 +89,7 @@ def scan() -> list[tuple[int, str, Path, dict[str, Any]]]:
             dep = meta["depends_on"]
             if dep:
                 dep_row = task_row(dep)
-                if not dep_row or dep_row["state"] not in ("PASS_CANDIDATE", "FINAL_PASS"):
+                if not dep_row or dep_row["state"] != "FINAL_PASS":
                     if row["state"] != "WAITING_DEPENDENCY":
                         set_task(row["id"], state="WAITING_DEPENDENCY")
                     continue
