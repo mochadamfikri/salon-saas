@@ -16,6 +16,8 @@ from app.models import (
     SalonMembership,
     SalonService,
     StaffProfile,
+    StaffServiceAssignment,
+    StaffWeeklyAvailability,
 )
 
 # ============================================================================
@@ -49,6 +51,42 @@ class AppointmentTenantInvariantError(ValueError):
 
 class CrossTenantResourceError(AppointmentTenantInvariantError):
     """Raised when a resource does not belong to the salon context."""
+
+    pass
+
+
+class AppointmentCapabilityError(ValueError):
+    """Base exception for capability and availability validation failures."""
+
+    pass
+
+
+class ServiceNotActiveError(AppointmentCapabilityError):
+    """Raised when attempting to book an inactive service."""
+
+    pass
+
+
+class StaffNotBookableError(AppointmentCapabilityError):
+    """Raised when attempting to book a staff member not marked as bookable."""
+
+    pass
+
+
+class StaffServiceAssignmentError(AppointmentCapabilityError):
+    """Raised when staff member is not assigned to the requested service."""
+
+    pass
+
+
+class StaffNotAvailableError(AppointmentCapabilityError):
+    """Raised when staff member has no availability for the requested time slot."""
+
+    pass
+
+
+class AppointmentOverlapError(ValueError):
+    """Raised when an appointment would overlap with an existing appointment."""
 
     pass
 
@@ -211,6 +249,126 @@ def validate_appointment_tenant_invariants(
     return customer, service, profile
 
 
+# ============================================================================
+# Booking Capability, Availability, and Conflict Validation
+# ============================================================================
+
+
+def _acquire_staff_booking_lock(db: Session, staff_profile_id: UUID) -> None:
+    """Serialize booking conflict checks for one staff profile within a transaction.
+
+    PostgreSQL advisory transaction locks close the check-then-insert race without
+    introducing a schema-specific exclusion constraint. The lock is released when
+    the enclosing transaction commits or rolls back.
+    """
+    lock_key = int.from_bytes(staff_profile_id.bytes[:8], byteorder="big", signed=True)
+    db.connection().exec_driver_sql("SELECT pg_advisory_xact_lock(%s)", (lock_key,))
+
+
+def validate_appointment_capability(
+    db: Session,
+    service: SalonService,
+    staff_profile: StaffProfile,
+) -> None:
+    """Validate that the selected active service can be booked by the staff profile."""
+    if not service.is_active:
+        raise ServiceNotActiveError("Service is not active")
+
+    if not staff_profile.is_bookable:
+        raise StaffNotBookableError("Staff profile is not bookable")
+
+    assignment_exists = (
+        db.query(StaffServiceAssignment.id)
+        .filter(
+            StaffServiceAssignment.staff_profile_id == staff_profile.id,
+            StaffServiceAssignment.salon_service_id == service.id,
+        )
+        .first()
+        is not None
+    )
+    if not assignment_exists:
+        raise StaffServiceAssignmentError("Staff profile is not assigned to this service")
+
+
+def validate_appointment_availability(
+    db: Session,
+    staff_profile_id: UUID,
+    starts_at: datetime,
+    ends_at: datetime,
+    timezone_name: str,
+) -> None:
+    """Require a single enabled weekly slot to contain the local appointment interval.
+
+    Weekly availability is interpreted in the appointment's IANA timezone. A booking
+    that crosses a local-date boundary is unavailable because Phase 2 weekly slots do
+    not span midnight.
+    """
+    timezone = ZoneInfo(timezone_name)
+    local_start = starts_at.astimezone(timezone)
+    local_end = ends_at.astimezone(timezone)
+    if local_start.date() != local_end.date():
+        raise StaffNotAvailableError("Appointment must fit within one local availability day")
+
+    start_time = local_start.timetz().replace(tzinfo=None)
+    end_time = local_end.timetz().replace(tzinfo=None)
+    availability_exists = (
+        db.query(StaffWeeklyAvailability.id)
+        .filter(
+            StaffWeeklyAvailability.staff_profile_id == staff_profile_id,
+            StaffWeeklyAvailability.day_of_week == local_start.weekday(),
+            StaffWeeklyAvailability.is_available.is_(True),
+            StaffWeeklyAvailability.start_time <= start_time,
+            StaffWeeklyAvailability.end_time >= end_time,
+        )
+        .first()
+        is not None
+    )
+    if not availability_exists:
+        raise StaffNotAvailableError("Staff profile is not available for the requested time")
+
+
+def find_overlapping_appointment(
+    db: Session,
+    salon_id: UUID,
+    staff_profile_id: UUID,
+    starts_at: datetime,
+    ends_at: datetime,
+    exclude_appointment_id: UUID | None = None,
+) -> Appointment | None:
+    """Return the first blocking staff appointment using the canonical overlap predicate."""
+    query = db.query(Appointment).filter(
+        Appointment.salon_id == salon_id,
+        Appointment.staff_profile_id == staff_profile_id,
+        Appointment.status != "cancelled",
+        starts_at < Appointment.ends_at,
+        ends_at > Appointment.starts_at,
+    )
+    if exclude_appointment_id is not None:
+        query = query.filter(Appointment.id != exclude_appointment_id)
+    return query.first()
+
+
+def validate_appointment_conflict(
+    db: Session,
+    salon_id: UUID,
+    staff_profile_id: UUID,
+    starts_at: datetime,
+    ends_at: datetime,
+    exclude_appointment_id: UUID | None = None,
+) -> None:
+    """Raise a deterministic error when a staff appointment overlaps another booking."""
+    overlapping = find_overlapping_appointment(
+        db=db,
+        salon_id=salon_id,
+        staff_profile_id=staff_profile_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        exclude_appointment_id=exclude_appointment_id,
+    )
+    if overlapping is not None:
+        raise AppointmentOverlapError("Staff profile already has an overlapping appointment")
+
+
 def create_appointment(
     db: Session,
     salon_id: UUID,
@@ -221,10 +379,11 @@ def create_appointment(
     timezone_name: str,
     notes: str | None = None,
 ) -> Appointment:
-    """Create an appointment record with snapshot capture and invariant validation.
+    """Create an appointment after tenant, capability, availability, and conflict checks.
 
-    Note: Overlap and availability validation are handled in P3-B.
-    This function validates tenant boundaries, takes snapshots, and enforces lifecycle.
+    Appointment duration and service metadata are snapshotted from the active service.
+    A per-staff PostgreSQL transaction advisory lock serializes the conflict check and
+    insert, preventing overlapping concurrent bookings when callers commit normally.
 
     Args:
         db: Database session
@@ -249,7 +408,7 @@ def create_appointment(
     valid_tz = validate_iana_timezone(timezone_name)
 
     # Validate tenant invariants and retrieve entities
-    _, service, _ = validate_appointment_tenant_invariants(
+    _, service, staff_profile = validate_appointment_tenant_invariants(
         db=db,
         salon_id=salon_id,
         customer_id=customer_id,
@@ -260,6 +419,28 @@ def create_appointment(
     # Compute ends_at from service duration snapshot
     duration = service.duration_minutes
     ends_at = starts_at + timedelta(minutes=duration)
+
+    # P3-B: Validate capability (service active, staff bookable, assignment exists)
+    validate_appointment_capability(db=db, service=service, staff_profile=staff_profile)
+
+    # P3-B: Validate weekly availability
+    validate_appointment_availability(
+        db=db,
+        staff_profile_id=staff_profile_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        timezone_name=valid_tz,
+    )
+
+    # P3-B: Acquire advisory lock and check overlap with race-safe serialization
+    _acquire_staff_booking_lock(db=db, staff_profile_id=staff_profile_id)
+    validate_appointment_conflict(
+        db=db,
+        salon_id=salon_id,
+        staff_profile_id=staff_profile_id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
 
     appointment = Appointment(
         salon_id=salon_id,

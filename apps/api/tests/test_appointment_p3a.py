@@ -1,7 +1,7 @@
 """Phase 3 Appointment domain model and lifecycle state machine tests."""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -13,6 +13,7 @@ from app.models import (
     SalonService,
     StaffProfile,
     StaffServiceAssignment,
+    StaffWeeklyAvailability,
     User,
 )
 from app.services.appointment import (
@@ -107,6 +108,20 @@ def phase3_test_context(db_session: Session) -> dict:
         salon_service_id=service.id,
     )
     db_session.add(assignment)
+    db_session.flush()
+
+    # P3-B booking precondition: all weekdays, 00:00-23:59 availability.
+    for day_of_week in range(7):
+        db_session.add(
+            StaffWeeklyAvailability(
+                id=uuid.uuid4(),
+                staff_profile_id=staff_profile.id,
+                day_of_week=day_of_week,
+                start_time=time(0, 0),
+                end_time=time(23, 59),
+                is_available=True,
+            )
+        )
     db_session.flush()
 
     customer = SalonCustomer(
