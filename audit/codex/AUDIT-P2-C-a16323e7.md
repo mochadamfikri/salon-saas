@@ -4,16 +4,15 @@
 - Source branch: feature/phase-2-web-codex
 - Base SHA: a16323e78da9e839994bc5eb548dd52779505267
 - Audited SHA: a16323e78da9e839994bc5eb548dd52779505267
-- Generated: 2026-10-01T10:05:03.373105+00:00
+- Generated: 2026-10-01T10:05:35.384264+00:00
 
 **Audit Report**
-- **Checkpoint:** Frontend P2-C — Staff Profile + Staff-Service Assignment
-- **Audited SHA:** `a16323e78da9e839994bc5eb548dd52779505267`
-- **Scope inspected:** Pinned commit and base diff; frontend source, tests, BFF patterns, package scripts, and available project documentation.
-- **Finding — High:** P2-C is not implemented at the audited SHA. The frontend has no staff-profile or staff-service assignment source or tests; `git ls-tree` and source search found no corresponding artifacts. The P2-C report named by the task is also absent. Therefore creation/read/update, role-aware controls, assignment management, and their BFF/session and tenant protections cannot be verified. The checkpoint requirements in the supplied Phase 2 spec remain unmet.
-- **Verification:** The base diff is empty because `BASE_SHA` equals `AUDITED_SHA`. `npm --prefix apps/web test` could not run: `vitest` is unavailable (`vitest: not found`), consistent with the trusted host verifier’s tooling warning. No P2-C tests or quality gates were available to run.
-- **Residual notes:** Existing P2-B code provides service-catalog patterns, but does not satisfy or establish P2-C behavior. This is an implementation gap, not an environment-only audit blockage.
-- **Verdict rationale:** `REVISE` because the requested checkpoint implementation is absent; one actionable finding remains.
+- Checkpoint: Frontend P2-C; audited SHA: `a16323e78da9e839994bc5eb548dd52779505267`.
+- Scope inspected: pinned Git state, web source tree, package scripts, P2-C report path, and P2-C profile/assignment references.
+- Findings: **High** — P2-C implementation is absent at the audited SHA. The only commit at `HEAD` adds the P2-B report; the P2-C report is missing, and no staff-profile or staff-service-assignment implementation or tests exist in `apps/web/src`. BFF/session security, role-aware UX, and profile/assignment behavior therefore cannot be verified for this checkpoint.
+- Tests/quality gates: none run. Frontend dependencies are absent, Node is `v20.20.2` (package requires `>=24 <25`), and the trusted host verifier reports blocked because `vitest` is missing.
+- Residual risks: implementation and required regression/quality evidence are unavailable at this SHA. `BASE_SHA` equals `AUDITED_SHA`, so the requested range contains no changes to compare.
+- Verdict rationale: the checkpoint cannot pass because the required frontend implementation is absent; available evidence is insufficient to audit behavior.
 
 AUDIT_VERDICT: REVISE
 AUDITED_SHA: a16323e78da9e839994bc5eb548dd52779505267
