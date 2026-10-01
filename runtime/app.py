@@ -445,8 +445,26 @@ DASHBOARD = r"""<!doctype html>
 const CSRF='__CSRF__';
 async function api(u,o={}){o.headers={...(o.headers||{}),'x-csrf-token':CSRF};let r=await fetch(u,o);if(r.status==401){location='/login';throw Error('login')}let j=await r.json();if(!r.ok)throw Error(j.detail||'error');return j}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function fmtWIB(v){
+  if(!v || v==='-') return '-';
+  const d = new Date(v);
+  if(Number.isNaN(d.getTime())) return String(v);
+
+  return new Intl.DateTimeFormat('id-ID',{
+    timeZone:'Asia/Jakarta',
+    day:'2-digit',
+    month:'short',
+    year:'numeric',
+    hour:'2-digit',
+    minute:'2-digit',
+    second:'2-digit',
+    hourCycle:'h23'
+  }).format(d).replace(' pukul ', ' • ') + ' WIB';
+}
+
 function showTab(id){document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
-async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(x.last_heartbeat||'-')}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>${esc(x.timestamp)}</div></div>`).join('');reportlist.innerHTML=r.slice(0,60).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,60).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
 async function act(w,a){try{await api(`/api/workers/${w}/${a}`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 async function readAll(){await api('/api/notifications/read-all',{method:'POST'});refresh()}
 async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`Validated Phase ${x.phase}: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}
