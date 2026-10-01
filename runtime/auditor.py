@@ -333,13 +333,13 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
         env["CODEX_HOME"] = AUDITOR_CODEX_HOME
         cmd = [
             AUDITOR_BIN,
+            "--ask-for-approval",
+            "never",
+            "--sandbox",
+            "workspace-write",
             "exec",
             "--cd",
             str(worktree),
-            "--sandbox",
-            "workspace-write",
-            "--ask-for-approval",
-            "never",
             "--json",
             "-o",
             str(result_path),

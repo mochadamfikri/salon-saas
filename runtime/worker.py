@@ -100,13 +100,13 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         env["CODEX_HOME"] = os.environ.get("CODEX_HOME", "/home/ubuntu/.codex-muse")
         cmd = [
             os.environ.get("CODEX_BIN", "codex"),
+            "--ask-for-approval",
+            "never",
+            "--sandbox",
+            "workspace-write",
             "exec",
             "--cd",
             str(workspace),
-            "--sandbox",
-            "workspace-write",
-            "--ask-for-approval",
-            "never",
             "--json",
             "-o",
             str(result_path),
