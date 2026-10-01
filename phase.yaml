@@ -1,6 +1,6 @@
 project: salon-saas
 control_plane_version: 1
-current_phase: 2
+current_phase: 3
 phase_status: active
 roles:
   owner: business_product_authority
@@ -24,7 +24,6 @@ rules:
   rehydrate_context_from_files: true
   production_actions_require_owner: true
   merge_requires_owner: true
-
 admin_panel:
   enabled: true
   owner_only: true
