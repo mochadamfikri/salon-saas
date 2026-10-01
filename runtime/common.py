@@ -204,6 +204,18 @@ def parse_task(path: Path) -> dict[str, Any]:
         m = re.search(r"\d+", raw_phase)
         phase = int(m.group()) if m else None
     priority = grab("PRIORITY")
+    status = (grab("STATUS") or "QUEUED").upper()
+    dep_match = re.search(
+        r"(?ms)^\s*DEPENDENCIES\s*:\s*\n((?:\s*-\s*[^\n]+\n?)*)",
+        text,
+    )
+    dependencies = []
+    if dep_match:
+        dependencies = [
+            line.strip()[1:].strip()
+            for line in dep_match.group(1).splitlines()
+            if line.strip().startswith("-")
+        ]
     return {
         "id": tid,
         "target_agent": (grab("TARGET_AGENT") or "").lower(),
@@ -211,6 +223,8 @@ def parse_task(path: Path) -> dict[str, Any]:
         "checkpoint": grab("CHECKPOINT"),
         "type": (grab("TYPE") or ("revision" if path.name.startswith("REV-") else "implementation")).lower(),
         "priority": int(priority) if priority and priority.isdigit() else 100,
+        "status": status,
+        "dependencies": dependencies,
         "authoritative_sha": grab("AUTHORITATIVE_SHA") or grab("AUDITED_SHA"),
         "text": text,
     }
@@ -234,7 +248,7 @@ def register_task(path: Path, agent: str) -> dict[str, Any]:
                 meta["checkpoint"],
                 meta["type"],
                 meta["priority"],
-                "QUEUED",
+                meta["status"],
                 str(path),
                 now_iso(),
                 meta["authoritative_sha"],
