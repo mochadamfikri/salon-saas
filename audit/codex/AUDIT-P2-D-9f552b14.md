@@ -9,11 +9,8 @@
 **Audit Report**
 - Checkpoint: P2-D frontend weekly availability
 - Audited SHA: `9f552b14a633786addcbae6e024d9c22d981ea22`
-- Scope: Reviewed the pinned diff, availability page and UI, BFF routes, backend client/contracts, and component tests. The BFF uses the existing authenticated-call/session handling; frontend role checks limit staff mutations to profiles whose `membership_id` matches the active membership. Tenant authorization remains backend-authoritative.
-- Validation: Trusted host verifier reports Vitest (28 files, 195 tests), TypeScript, ESLint, and production build all passing. `git diff --check` passed. Tests were not rerun locally because dependencies are absent.
-- Findings: None. The UI provides weekly display and add/edit/delete controls, validates day/time bounds, and reports 409 overlap/conflict responses. No out-of-scope booking functionality was added.
-- Residual note: Overlap enforcement is correctly delegated to the backend; client-side checks do not attempt to duplicate it.
-- Verdict rationale: Source review and pinned trusted-host verification provide sufficient evidence for the checkpoint; no contract or regression issue found.
+- Findings: None.
+- Verdict rationale: Source review and pinned trusted-host verification provide sufficient evidence for the checkpoint.
 
 AUDIT_VERDICT: PASS
 AUDITED_SHA: 9f552b14a633786addcbae6e024d9c22d981ea22
