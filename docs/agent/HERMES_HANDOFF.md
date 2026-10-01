@@ -16,9 +16,11 @@ Checkpoint E belum selesai.
 - P2-C: FINAL PASS
   - IMPLEMENTATION SHA: `0c869b3543f6846e87c3fe78528c0bcda70c300a`
   - REPORT/DOCS SHA: `96ae8cde2891f3c10699ba43f2c1f062ededf6f9`
-- P2-D: READY FOR AUDIT
+- P2-D: READY FOR AUDIT (REVISED)
   - IMPLEMENTATION SHA: `cdeb8f1`
   - REPORT/DOCS SHA: `d797720`
+  - REMEDIATION TASK: `REV-P2-D-d797720`
+  - REMEDIATION SHA: `f55b3b3`
 - P2-E: READY FOR AUDIT
   - IMPLEMENTATION SHA: `177fbbb`
   - REPORT/DOCS SHA: `6e51a51`
@@ -26,10 +28,10 @@ Checkpoint E belum selesai.
 ## Backend Phase 2 Summary
 
 ### Total Test Count
-217 tests PASS (Phase 1 + P2-A through P2-E combined)
+221 tests PASS (Phase 1 + P2-A through P2-E combined + P2-D remediation tests)
 
 ### Quality Gates Status
-- `pytest -q`: PASS (217 passed in 124.64s)
+- `pytest -q`: PASS (221 passed in 126.02s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
@@ -47,7 +49,8 @@ Checkpoint E belum selesai.
 - RBAC: Owner/Manager manage any profile; Staff manage own profile only
 - Overlap protection: rejects overlapping intervals, allows adjacent slots
 - DB IntegrityError mapping: `uq_staff_weekly_availability_staff_day_start` → 409
-- 22 new tests
+- PATCH validation: rejects explicit null for constraint fields (day_of_week, start_time, end_time)
+- 26 tests (22 original + 4 remediation)
 
 #### P2-E: Customer Records API
 - Endpoints: POST, GET (list), GET (detail), PATCH (no DELETE)
