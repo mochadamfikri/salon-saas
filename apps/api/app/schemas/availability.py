@@ -3,7 +3,7 @@
 from datetime import datetime, time
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AvailabilityCreateRequest(BaseModel):
@@ -48,6 +48,19 @@ class AvailabilityUpdateRequest(BaseModel):
         if v is not None and not 0 <= v <= 6:
             raise ValueError("day_of_week must be between 0 and 6")
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_explicit_nulls(cls, data):
+        """Reject explicit null for constraint fields; omit to leave unchanged."""
+        if not isinstance(data, dict):
+            return data
+        for field in ["day_of_week", "start_time", "end_time"]:
+            if field in data and data[field] is None:
+                raise ValueError(
+                    f"{field} cannot be explicitly set to null; omit the field to leave unchanged"
+                )
+        return data
 
 
 class AvailabilityResponse(BaseModel):

@@ -704,3 +704,44 @@ def test_unrelated_integrity_error_is_not_converted_to_409(
             headers=_auth(owner_token),
             json={"day_of_week": 0, "start_time": "09:00:00", "end_time": "12:00:00"},
         )
+
+
+# ============================================================================
+# PATCH Validation: Explicit Null Rejection
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"day_of_week": None},
+        {"start_time": None},
+        {"end_time": None},
+        {"day_of_week": None, "start_time": None, "end_time": None},
+    ],
+)
+def test_patch_availability_rejects_explicit_null(
+    payload: dict, availability_setup: dict[str, object]
+) -> None:
+    salon = availability_setup["salon"]
+    staff1_profile = availability_setup["staff1_profile"]
+    owner_token = str(availability_setup["owner_token"])
+    assert isinstance(salon, Salon)
+    assert isinstance(staff1_profile, StaffProfile)
+
+    # Create initial slot
+    res = client.post(
+        f"/salons/{salon.id}/staff-profiles/{staff1_profile.id}/availability",
+        headers=_auth(owner_token),
+        json={"day_of_week": 0, "start_time": "09:00:00", "end_time": "17:00:00"},
+    )
+    assert res.status_code == 201
+    slot_id = res.json()["id"]
+
+    # PATCH with explicit null must be rejected with 422
+    patch_res = client.patch(
+        f"/salons/{salon.id}/staff-profiles/{staff1_profile.id}/availability/{slot_id}",
+        headers=_auth(owner_token),
+        json=payload,
+    )
+    assert patch_res.status_code == 422
