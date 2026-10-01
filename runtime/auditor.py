@@ -23,6 +23,8 @@ from common import (
     update_worker,
 )
 
+from progress import run_streamed
+
 POLL = int(os.environ.get("AUDITOR_POLL_SECONDS", "30"))
 AUDITOR_BIN = os.environ.get("AUDITOR_BIN") or os.environ.get("CODEX_BIN", "codex")
 AUDITOR_CODEX_HOME = os.environ.get("AUDITOR_CODEX_HOME") or os.environ.get("CODEX_HOME", "/home/ubuntu/.codex-muse")
@@ -304,6 +306,10 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
         branch=meta.get("source_branch"),
         task_started_at=now_iso(),
         retry_attempt=attempts - 1,
+        current_stage="Preparing audit",
+        current_activity="Menyiapkan worktree audit",
+        progress_pct=10,
+        activity_updated_at=now_iso(),
     )
     emit(
         "auditor",
@@ -345,21 +351,21 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
             str(result_path),
             "-",
         ]
-        proc = subprocess.run(
+        returncode, output = run_streamed(
             cmd,
-            input=prompt,
-            text=True,
             cwd=worktree,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            worker_id="auditor",
+            input_text=prompt,
+            initial_stage="Inspecting",
+            initial_activity="Memulai audit checkpoint",
+            initial_progress=18,
         )
-        output = proc.stdout or ""
         report = result_path.read_text(encoding="utf-8", errors="replace") if result_path.exists() else output
-        if proc.returncode != 0:
-            report += f"\n\nAUDITOR PROCESS EXIT: {proc.returncode}\n\n{output[-3000:]}"
+        if returncode != 0:
+            report += f"\n\nAUDITOR PROCESS EXIT: {returncode}\n\n{output[-3000:]}"
         verdict, findings = parse_verdict(report, audited_sha)
-        if proc.returncode != 0:
+        if returncode != 0:
             verdict = "BLOCKED"
 
         report_dir = ROOT / "audit" / source
@@ -393,6 +399,10 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
                 head_sha=audited_sha,
                 last_exit_code=0,
                 last_successful_checkpoint=row["checkpoint"],
+                current_stage="Audit complete",
+                current_activity="Pre-audit selesai; menunggu final review",
+                progress_pct=100,
+                activity_updated_at=now_iso(),
             )
             emit(
                 "auditor",
@@ -416,7 +426,9 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
                 result_path=str(report_path),
                 last_error=f"REVISION_TASK_ID={rev_id}",
             )
-            update_worker("auditor", status="WAITING_REVISION", current_task_id=row["id"], last_exit_code=0)
+            update_worker("auditor", status="WAITING_REVISION", current_task_id=row["id"], last_exit_code=0,
+                          current_stage="Revision required", current_activity="Menunggu remediation engineer",
+                          progress_pct=100, activity_updated_at=now_iso())
             emit(
                 "auditor",
                 "audit.revise",
@@ -436,7 +448,9 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
                 result_path=str(report_path),
                 last_error="Automated auditor could not produce a reliable PASS/REVISE verdict",
             )
-            update_worker("auditor", status="BLOCKED", current_task_id=row["id"], last_exit_code=proc.returncode)
+            update_worker("auditor", status="BLOCKED", current_task_id=row["id"], last_exit_code=returncode,
+                          current_stage="Blocked", current_activity="Audit tidak dapat diselesaikan",
+                          progress_pct=100, activity_updated_at=now_iso())
             emit(
                 "auditor",
                 "audit.blocked",
@@ -456,7 +470,9 @@ def run_audit(path: Path, row: dict[str, Any]) -> None:
 
 def main() -> None:
     init_db()
-    update_worker("auditor", status="WAITING")
+    update_worker("auditor", status="WAITING", current_stage="Idle",
+                  current_activity="Menunggu audit task", progress_pct=0,
+                  activity_updated_at=now_iso())
     emit("auditor", "worker.online", "INFO", "Auditor worker online", "Independent audit worker started")
     while True:
         try:

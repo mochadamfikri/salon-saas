@@ -99,6 +99,28 @@ def init_db() -> None:
         );
         """
     )
+    # Runtime telemetry columns are additive so existing SQLite state is preserved.
+    worker_columns = {row["name"] for row in con.execute("PRAGMA table_info(workers)").fetchall()}
+    worker_additions = {
+        "current_stage": "TEXT",
+        "current_activity": "TEXT",
+        "progress_pct": "INTEGER NOT NULL DEFAULT 0",
+        "activity_updated_at": "TEXT",
+    }
+    for column, ddl in worker_additions.items():
+        if column not in worker_columns:
+            con.execute(f"ALTER TABLE workers ADD COLUMN {column} {ddl}")
+
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS report_registry ("
+        "id TEXT PRIMARY KEY,"
+        "agent TEXT NOT NULL,"
+        "name TEXT NOT NULL,"
+        "path TEXT NOT NULL,"
+        "first_seen_at TEXT NOT NULL,"
+        "last_seen_at TEXT NOT NULL)"
+    )
+
     defaults = [
         ("hermes", "backend_engineer", "WAITING"),
         ("codex", "frontend_engineer", "WAITING"),

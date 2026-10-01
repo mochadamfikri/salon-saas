@@ -11,6 +11,8 @@ import subprocess
 import time
 import uuid
 import zipfile
+from datetime import datetime, timezone
+import re
 from pathlib import Path
 
 import yaml
@@ -154,6 +156,41 @@ def workers(request: Request):
     return query_all("SELECT * FROM workers ORDER BY id")
 
 
+
+@app.get("/api/workers/{worker_id}/detail")
+def worker_detail(request: Request, worker_id: str):
+    require(request)
+    worker = query_one("SELECT * FROM workers WHERE id=?", (worker_id,))
+    if not worker:
+        raise HTTPException(404, "worker not found")
+
+    task = None
+    if worker.get("current_task_id"):
+        task = query_one("SELECT * FROM tasks WHERE id=?", (worker["current_task_id"],))
+
+    events = query_all(
+        "SELECT timestamp,severity,title,message,type,task_id "
+        "FROM events "
+        "WHERE source=? OR (? IS NOT NULL AND task_id=?) "
+        "ORDER BY timestamp DESC LIMIT 12",
+        (worker_id, worker.get("current_task_id"), worker.get("current_task_id")),
+    )
+
+    progress = int(worker.get("progress_pct") or 0)
+    if worker.get("status") in ("READY_FOR_AUDIT",):
+        progress = 100
+    elif worker.get("status") in ("WAITING", "OFFLINE", "PAUSED") and not worker.get("current_task_id"):
+        progress = 0
+
+    return {
+        "worker": worker,
+        "task": task,
+        "events": events,
+        "progress_pct": max(0, min(progress, 100)),
+        "progress_is_estimate": True,
+    }
+
+
 @app.get("/api/workers/{worker_id}/logs")
 def worker_logs(request: Request, worker_id: str, limit: int = 200):
     require(request)
@@ -245,18 +282,90 @@ def read_all(request: Request):
     return {"ok": True}
 
 
+def _report_roots():
+    return [
+        ("backend", BACKEND_WORKSPACE / "docs/reports", BACKEND_WORKSPACE),
+        ("frontend", FRONTEND_WORKSPACE / "docs/reports", FRONTEND_WORKSPACE),
+        ("orchestrator", ROOT / "audit", ROOT),
+    ]
+
+
+def _report_created_at(path: Path, agent: str, repo: Path, content: str) -> str:
+    for pattern in (
+        r"(?mi)^\s*-\s*Generated:\s*(.+?)\s*$",
+        r"(?mi)^\s*Generated:\s*(.+?)\s*$",
+        r"(?mi)^\s*Created:\s*(.+?)\s*$",
+        r"(?mi)^\s*Completed:\s*(.+?)\s*$",
+    ):
+        m = re.search(pattern, content)
+        if m:
+            return m.group(1).strip()
+
+    try:
+        rel = path.relative_to(repo)
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "log", "--follow", "--diff-filter=A", "--format=%cI", "--", str(rel)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        line = next((x.strip() for x in proc.stdout.splitlines() if x.strip()), "")
+        if line:
+            return line
+    except Exception:
+        pass
+
+    return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
+
+
+def _report_status(path: Path, content: str) -> str:
+    task = query_one("SELECT state FROM tasks WHERE result_path=?", (str(path),))
+    if task and task.get("state"):
+        return str(task["state"])
+
+    for pattern in (
+        r"(?mi)^\s*[-*]?\s*(?:P\d+-[A-Z]\s+)?Status\s*:\s*(.+?)\s*$",
+        r"(?mi)^\s*AUDIT_VERDICT\s*:\s*(.+?)\s*$",
+    ):
+        m = re.search(pattern, content)
+        if m:
+            return m.group(1).strip()[:100]
+
+    upper = content.upper()
+    for token in ("FINAL PASS", "READY FOR AUDIT", "PASS_CANDIDATE", "REVISE_REQUIRED", "BLOCKED", "COMPLETE"):
+        if token in upper:
+            return token
+    return "REPORT"
+
+
 def report_index():
     result = []
-    roots = [
-        ("backend", BACKEND_WORKSPACE / "docs/reports"),
-        ("frontend", FRONTEND_WORKSPACE / "docs/reports"),
-        ("orchestrator", ROOT / "audit"),
-    ]
-    for agent, base in roots:
+    now = now_iso()
+    con = db()
+
+    for agent, base, repo in _report_roots():
         if not base.exists():
             continue
         for path in base.rglob("*.md"):
             report_id = hashlib.sha1(str(path).encode()).hexdigest()[:16]
+            existing = con.execute(
+                "SELECT first_seen_at FROM report_registry WHERE id=?",
+                (report_id,),
+            ).fetchone()
+            if not existing:
+                con.execute(
+                    "INSERT INTO report_registry(id,agent,name,path,first_seen_at,last_seen_at) "
+                    "VALUES(?,?,?,?,?,?)",
+                    (report_id, agent, path.name, str(path), now, now),
+                )
+                first_seen = now
+            else:
+                first_seen = existing["first_seen_at"]
+                con.execute(
+                    "UPDATE report_registry SET agent=?,name=?,path=?,last_seen_at=? WHERE id=?",
+                    (agent, path.name, str(path), now, report_id),
+                )
+
             result.append(
                 {
                     "id": report_id,
@@ -264,8 +373,14 @@ def report_index():
                     "name": path.name,
                     "path": str(path),
                     "mtime": path.stat().st_mtime,
+                    "modified_at": datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(),
+                    "first_seen_at": first_seen,
+                    "size_bytes": path.stat().st_size,
                 }
             )
+
+    con.commit()
+    con.close()
     return sorted(result, key=lambda x: x["mtime"], reverse=True)
 
 
@@ -273,6 +388,34 @@ def report_index():
 def reports(request: Request):
     require(request)
     return report_index()
+
+
+
+@app.get("/api/reports/{report_id}")
+def report_detail(request: Request, report_id: str):
+    require(request)
+    for item in report_index():
+        if item["id"] != report_id:
+            continue
+
+        path = Path(item["path"])
+        content = path.read_text(encoding="utf-8", errors="replace")
+        repo = {
+            "backend": BACKEND_WORKSPACE,
+            "frontend": FRONTEND_WORKSPACE,
+            "orchestrator": ROOT,
+        }[item["agent"]]
+
+        return {
+            **item,
+            "created_at": _report_created_at(path, item["agent"], repo, content),
+            "status": _report_status(path, content),
+            "content": content[:250000],
+            "truncated": len(content) > 250000,
+            "download_url": f"/api/reports/{report_id}/download",
+        }
+
+    raise HTTPException(404, "report not found")
 
 
 @app.get("/api/reports/{report_id}/download")
@@ -689,6 +832,23 @@ body{
   }
 }
 
+
+/* IDSE_DETAIL_MODAL_V1 */
+.worker-card,.report-card{cursor:pointer}
+.modal-layer{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal-layer.hidden{display:none}
+.modal-box{width:min(760px,100%);max-height:88vh;overflow:auto;background:#0f151f;border:1px solid #2b3546;border-radius:18px;padding:20px;position:relative}
+.modal-x{position:absolute;right:12px;top:12px;width:38px;height:38px;padding:0;font-size:23px;line-height:1}
+.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}
+.detail-item{background:#151c27;border:1px solid #242e3d;border-radius:12px;padding:11px}
+.detail-item .k{font-size:11px;color:#8e9bad;text-transform:uppercase;letter-spacing:.07em}
+.detail-item .v{margin-top:4px;word-break:break-word}
+.progress-shell{height:10px;background:#202837;border-radius:99px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:#6475e8;border-radius:99px}
+.activity-list{margin:8px 0 0;padding:0;list-style:none}.activity-list li{padding:8px 0;border-bottom:1px solid #202938}
+.report-body{white-space:pre-wrap;word-break:break-word;background:#090d13;border:1px solid #222b39;border-radius:12px;padding:13px;max-height:42vh;overflow:auto;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:640px){.modal-layer{padding:8px}.modal-box{max-height:92vh;padding:17px}.detail-grid{grid-template-columns:1fr}}
+
 </style></head><body>
 <div class=top>
 <div class=brandbar>
@@ -709,6 +869,13 @@ body{
 <section id=reports class="section hidden"><h2>Reports</h2><div id=reportlist class=grid></div></section>
 <section id=phases class="section hidden"><h2>Upload Phase</h2><div class=card><input id=phasefile type=file accept=".md,.zip"> <button onclick=uploadPhase()>Upload & Validate</button><div id=phaseout class=muted></div></div><h3>Uploads</h3><div id=phaselist></div></section>
 <section id=notifications class="section hidden"><h2>Notifications</h2><button onclick=readAll()>Tandai semua dibaca</button><div id=notifs></div></section></div>
+
+<div id="detailModal" class="modal-layer hidden" onclick="closeDetail()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <button class="modal-x" onclick="closeDetail()" aria-label="Close">×</button>
+    <div id="detailContent">Loading...</div>
+  </div>
+</div>
 <script>
 const CSRF='__CSRF__';
 async function api(u,o={}){o.headers={...(o.headers||{}),'x-csrf-token':CSRF};let r=await fetch(u,o);if(r.status==401){location='/login';throw Error('login')}let j=await r.json();if(!r.ok)throw Error(j.detail||'error');return j}
@@ -732,7 +899,89 @@ function fmtWIB(v){
 }
 
 function showTab(id){document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
-async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class=card><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class=card><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}</p><a href="/api/reports/${x.id}/download"><button>Download</button></a></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+async function refresh(){let [p,w,t,n,r,ph]=await Promise.all([api('/api/project'),api('/api/workers'),api('/api/tasks'),api('/api/notifications'),api('/api/reports'),api('/api/phases')]);project.innerHTML=`Phase <b>${esc(p.current_phase)}</b> · ${esc(p.phase_status)}<br><span class=muted>Backend ${esc(p.backend_git?.head_sha?.slice(0,8))} · Frontend ${esc(p.frontend_git?.head_sha?.slice(0,8))}</span>`;workers.innerHTML=w.map(x=>`<div class="card worker-card" onclick="openWorker('${x.id}')"><b>${esc(x.id==='auditor'?'AUTO AUDITOR':x.id.toUpperCase())}</b> <span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(x.status)?'bad':['RECOVERING','PAUSED','WAITING_REVISION'].includes(x.status)?'warn':'good'}">${esc(x.status)}</span><p>${esc(x.role)}</p><div class=muted>Task: ${esc(x.current_task_id||'-')}<br>Checkpoint: ${esc(x.checkpoint||'-')}<br>HEAD: ${esc((x.head_sha||'').slice(0,8))}<br>Heartbeat: ${esc(fmtWIB(x.last_heartbeat))}</div>${['hermes','codex'].includes(x.id)?`<p><button onclick="event.stopPropagation();act('${x.id}','${x.paused?'resume':'pause'}')">${x.paused?'Resume':'Pause'}</button> <button onclick="event.stopPropagation();act('${x.id}','retry')">Retry</button></p>`:''}</div>`).join('');taskrows.innerHTML=t.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.target_agent)}</td><td>${esc(x.state)}</td><td>${esc(x.checkpoint||'')}</td><td>${esc(x.attempts)}</td></tr>`).join('');document.getElementById('unread').textContent=n.filter(x=>!x.read_at).length;notifs.innerHTML=n.slice(0,30).map(x=>`<div class=card style="margin-top:8px"><b>${esc(x.severity)} · ${esc(x.title)}</b><div>${esc(x.message)}</div><div class=muted>🕒 ${esc(fmtWIB(x.timestamp))}</div></div>`).join('');reportlist.innerHTML=r.slice(0,30).map(x=>`<div class="card report-card" onclick="openReport('${x.id}')"><b>${esc(x.name)}</b><p class=muted>${esc(x.agent)}<br>Masuk panel: ${esc(fmtWIB(x.first_seen_at))}</p><button onclick="event.stopPropagation();openReport('${x.id}')">Lihat detail</button></div>`).join('');phaselist.innerHTML=ph.map(x=>`<div class=card style="margin-top:8px"><b>Phase ${x.phase}</b> · ${esc(x.status)}<br><span class=muted>${esc(x.master_spec_name)}</span>${x.status==='VALIDATED'?`<p><button onclick="activate('${x.id}')">Activate Phase</button></p>`:''}</div>`).join('')}
+
+let detailTimer=null;
+let detailKind=null;
+let detailId=null;
+
+function closeDetail(){
+  document.getElementById('detailModal').classList.add('hidden');
+  if(detailTimer){clearInterval(detailTimer);detailTimer=null}
+  detailKind=null;detailId=null;
+}
+
+function showDetail(html){
+  document.getElementById('detailContent').innerHTML=html;
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+
+function durationSince(v){
+  if(!v)return '-';
+  const ms=Date.now()-new Date(v).getTime();
+  if(!Number.isFinite(ms)||ms<0)return '-';
+  const sec=Math.floor(ms/1000), min=Math.floor(sec/60), hr=Math.floor(min/60);
+  if(hr)return `${hr}j ${min%60}m`;
+  if(min)return `${min}m ${sec%60}d`;
+  return `${sec}d`;
+}
+
+async function openWorker(id){
+  detailKind='worker';detailId=id;
+  await refreshWorkerDetail();
+  if(detailTimer)clearInterval(detailTimer);
+  detailTimer=setInterval(refreshWorkerDetail,4000);
+}
+
+async function refreshWorkerDetail(){
+  if(detailKind!=='worker'||!detailId)return;
+  const d=await api(`/api/workers/${detailId}/detail`);
+  const w=d.worker,t=d.task,p=d.progress_pct||0;
+  const name=w.id==='auditor'?'AUTO AUDITOR':String(w.id).toUpperCase();
+  const events=(d.events||[]).map(e=>`<li><b>${esc(e.title)}</b><br><span class=muted>${esc(e.message)} · ${esc(fmtWIB(e.timestamp))}</span></li>`).join('');
+  showDetail(`
+    <h2 style="margin-top:0">${esc(name)}</h2>
+    <div><span class="pill ${['ERROR','BLOCKED','OFFLINE'].includes(w.status)?'bad':['RECOVERING','PAUSED','WAITING_REVISION'].includes(w.status)?'warn':'good'}">${esc(w.status)}</span></div>
+    <p class=muted>Estimasi progress operasional — bukan progress internal reasoning model.</p>
+    <b>${p}%</b>
+    <div class=progress-shell><div class=progress-fill style="width:${p}%"></div></div>
+    <div class=detail-grid>
+      <div class=detail-item><div class=k>Stage</div><div class=v>${esc(w.current_stage||'-')}</div></div>
+      <div class=detail-item><div class=k>Aktivitas</div><div class=v>${esc(w.current_activity||'-')}</div></div>
+      <div class=detail-item><div class=k>Task</div><div class=v>${esc(w.current_task_id||'-')}</div></div>
+      <div class=detail-item><div class=k>Checkpoint</div><div class=v>${esc(w.checkpoint||'-')}</div></div>
+      <div class=detail-item><div class=k>Branch</div><div class=v>${esc(w.branch||'-')}</div></div>
+      <div class=detail-item><div class=k>HEAD</div><div class=v>${esc(w.head_sha||'-')}</div></div>
+      <div class=detail-item><div class=k>Started</div><div class=v>${esc(fmtWIB(w.task_started_at))}</div></div>
+      <div class=detail-item><div class=k>Elapsed</div><div class=v>${esc(durationSince(w.task_started_at))}</div></div>
+      <div class=detail-item><div class=k>Attempts</div><div class=v>${esc(t?.attempts??w.retry_attempt??0)}</div></div>
+      <div class=detail-item><div class=k>Heartbeat</div><div class=v>${esc(fmtWIB(w.last_heartbeat))}</div></div>
+    </div>
+    <h3>Recent activity</h3>
+    <ul class=activity-list>${events||'<li class=muted>Belum ada event.</li>'}</ul>
+  `);
+}
+
+async function openReport(id){
+  detailKind='report';detailId=id;
+  if(detailTimer){clearInterval(detailTimer);detailTimer=null}
+  const d=await api(`/api/reports/${id}`);
+  showDetail(`
+    <h2 style="margin-top:0">Report Detail</h2>
+    <div class=detail-grid>
+      <div class=detail-item><div class=k>Nama</div><div class=v>${esc(d.name)}</div></div>
+      <div class=detail-item><div class=k>Agent</div><div class=v>${esc(d.agent)}</div></div>
+      <div class=detail-item><div class=k>Status</div><div class=v>${esc(d.status)}</div></div>
+      <div class=detail-item><div class=k>Dibuat</div><div class=v>${esc(fmtWIB(d.created_at))}</div></div>
+      <div class=detail-item><div class=k>Masuk panel</div><div class=v>${esc(fmtWIB(d.first_seen_at))}</div></div>
+      <div class=detail-item><div class=k>Terakhir berubah</div><div class=v>${esc(fmtWIB(d.modified_at))}</div></div>
+    </div>
+    <p><a href="${esc(d.download_url)}"><button>Download report</button></a></p>
+    <h3>Isi report</h3>
+    <pre class=report-body>${esc(d.content)}${d.truncated?'\\n\\n[Preview dipotong. Download untuk file lengkap.]':''}</pre>
+  `);
+}
+
 async function act(w,a){try{await api(`/api/workers/${w}/${a}`,{method:'POST'});refresh()}catch(e){alert(e.message)}}
 async function readAll(){await api('/api/notifications/read-all',{method:'POST'});refresh()}
 async function uploadPhase(){let f=phasefile.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);try{let x=await api('/api/phases/upload',{method:'POST',body:fd});phaseout.textContent=`Validated Phase ${x.phase}: ${x.master_spec}`;refresh()}catch(e){phaseout.textContent='ERROR: '+e.message}}

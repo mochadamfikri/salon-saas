@@ -21,6 +21,8 @@ from common import (
     update_worker,
 )
 
+from progress import run_streamed
+
 POLL = int(os.environ.get("WORKER_POLL_SECONDS", "30"))
 MAX_ATTEMPTS = int(os.environ.get("WORKER_MAX_ATTEMPTS", "3"))
 
@@ -82,6 +84,10 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         working_tree_clean=1 if before["working_tree_clean"] else 0,
         task_started_at=now_iso(),
         retry_attempt=attempts - 1,
+        current_stage="Preparing",
+        current_activity="Menyiapkan task dan workspace",
+        progress_pct=8,
+        activity_updated_at=now_iso(),
     )
     emit(
         agent,
@@ -112,34 +118,35 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             str(result_path),
             "-",
         ]
-        proc = subprocess.run(
+        returncode, output = run_streamed(
             cmd,
-            input=prompt,
-            text=True,
             cwd=workspace,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            worker_id=agent,
+            input_text=prompt,
+            initial_stage="Loading context",
+            initial_activity="Memuat task frontend",
+            initial_progress=12,
         )
     else:
         cmd = [os.environ.get("HERMES_BIN", "hermes"), "chat", "--query-file", str(prompt_path), "--oneshot"]
-        proc = subprocess.run(
+        returncode, output = run_streamed(
             cmd,
-            text=True,
             cwd=workspace,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            worker_id=agent,
+            initial_stage="Loading context",
+            initial_activity="Memuat task backend",
+            initial_progress=12,
         )
-        result_path.write_text(proc.stdout or "", encoding="utf-8")
+        result_path.write_text(output or "", encoding="utf-8")
 
-    output = proc.stdout or ""
-    summary = output[-2000:] if output else f"process exited {proc.returncode}"
+    summary = output[-2000:] if output else f"process exited {returncode}"
     log(agent, summary.replace("\n", " | "))
 
     after = git_info(workspace)
     con = db()
-    if proc.returncode == 0:
+    if returncode == 0:
         con.execute(
             "UPDATE tasks SET state='READY_FOR_AUDIT',finished_at=?,result_path=?,last_error=NULL WHERE id=?",
             (now_iso(), str(result_path), row["id"]),
@@ -155,6 +162,10 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             working_tree_clean=1 if after["working_tree_clean"] else 0,
             last_exit_code=0,
             last_successful_checkpoint=row["checkpoint"],
+            current_stage="Ready for audit",
+            current_activity="Task selesai; menunggu audit",
+            progress_pct=100,
+            activity_updated_at=now_iso(),
         )
         emit(
             agent,
@@ -169,7 +180,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         )
         return
 
-    err = f"exit={proc.returncode}; {output[-1500:]}"
+    err = f"exit={returncode}; {output[-1500:]}"
     if attempts < MAX_ATTEMPTS:
         con.execute(
             "UPDATE tasks SET state='REVISE',last_error=? WHERE id=?",
@@ -180,7 +191,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         update_worker(
             agent,
             status="RECOVERING",
-            last_exit_code=proc.returncode,
+            last_exit_code=returncode,
             retry_attempt=attempts,
         )
         emit(
@@ -204,7 +215,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
         update_worker(
             agent,
             status="BLOCKED",
-            last_exit_code=proc.returncode,
+            last_exit_code=returncode,
             retry_attempt=attempts,
         )
         emit(
@@ -216,7 +227,7 @@ def run_task(agent: str, path: Path, row: dict) -> None:
             phase=row["phase"],
             checkpoint=row["checkpoint"],
             task_id=row["id"],
-            metadata={"exit_code": proc.returncode},
+            metadata={"exit_code": returncode},
         )
 
 
@@ -250,6 +261,10 @@ def main() -> None:
                     branch=info["branch"],
                     head_sha=info["head_sha"],
                     working_tree_clean=1 if info["working_tree_clean"] else 0,
+                    current_stage="Idle",
+                    current_activity="Menunggu task",
+                    progress_pct=0,
+                    activity_updated_at=now_iso(),
                 )
                 time.sleep(POLL)
                 continue
