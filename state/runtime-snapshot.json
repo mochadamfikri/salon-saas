@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T09:02:48.301643+00:00",
+  "generated_at": "2026-10-01T09:03:20.515860+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T09:02:40.569916+00:00",
+      "last_heartbeat": "2026-10-01T09:03:10.580793+00:00",
       "current_stage": "Audit complete",
       "current_activity": "Pre-audit selesai; menunggu final review",
       "progress_pct": 100,
@@ -26,7 +26,7 @@
       "checkpoint": null,
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T09:02:37.541097+00:00",
+      "last_heartbeat": "2026-10-01T09:03:07.559231+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T09:02:37.547157+00:00",
+      "last_heartbeat": "2026-10-01T09:03:07.571296+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T09:02:39.484435+00:00",
+      "last_heartbeat": "2026-10-01T09:03:09.502887+00:00",
       "current_stage": null,
       "current_activity": null,
       "progress_pct": 0,
