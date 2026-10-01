@@ -487,9 +487,7 @@ def test_change_appointment_status_terminal_state_rejected(
 # ============================================================================
 
 
-def test_appointment_query_by_id_scoped_to_salon(
-    db_session: Session, phase3_test_context: dict
-):
+def test_appointment_query_by_id_scoped_to_salon(db_session: Session, phase3_test_context: dict):
     """Verify appointment can be queried by ID and is strictly scoped to salon."""
     ctx = phase3_test_context
     starts_at = datetime(2026, 10, 15, 10, 0, tzinfo=UTC)

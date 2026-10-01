@@ -281,4 +281,3 @@ def create_appointment(
     db.flush()
     db.refresh(appointment)
     return appointment
-
