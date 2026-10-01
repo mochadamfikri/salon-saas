@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T11:02:48.545815+00:00",
+  "generated_at": "2026-10-01T11:03:20.794634+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T11:02:46.613665+00:00",
+      "last_heartbeat": "2026-10-01T11:03:16.621573+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu audit task",
       "progress_pct": 0,
@@ -20,16 +20,16 @@
     {
       "id": "codex",
       "role": "frontend_engineer",
-      "status": "RECOVERING",
+      "status": "RUNNING",
       "current_task_id": "FE-P2-C",
       "phase": 2,
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T11:02:45.295428+00:00",
-      "current_stage": "Implementing",
-      "current_activity": "Mengerjakan perubahan source",
-      "progress_pct": 96,
+      "last_heartbeat": "2026-10-01T11:03:17.787553+00:00",
+      "current_stage": "Committing",
+      "current_activity": "Membuat commit",
+      "progress_pct": 86,
       "last_successful_checkpoint": "P2-E"
     },
     {
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T11:02:41.114055+00:00",
+      "last_heartbeat": "2026-10-01T11:03:11.127554+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T11:02:46.736711+00:00",
+      "last_heartbeat": "2026-10-01T11:03:16.779917+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
