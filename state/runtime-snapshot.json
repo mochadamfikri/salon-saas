@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T10:55:08.041551+00:00",
+  "generated_at": "2026-10-01T10:55:47.285202+00:00",
   "workers": [
     {
       "id": "auditor",
@@ -11,7 +11,7 @@
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:54:58.790801+00:00",
+      "last_heartbeat": "2026-10-01T10:55:46.475642+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu audit task",
       "progress_pct": 0,
@@ -20,16 +20,16 @@
     {
       "id": "codex",
       "role": "frontend_engineer",
-      "status": "WAITING",
-      "current_task_id": null,
+      "status": "RUNNING",
+      "current_task_id": "FE-P2-C",
       "phase": 2,
       "checkpoint": "P2-C",
       "branch": "feature/phase-2-web-codex",
       "head_sha": "a16323e78da9e839994bc5eb548dd52779505267",
-      "last_heartbeat": "2026-10-01T10:55:04.574169+00:00",
-      "current_stage": "Idle",
-      "current_activity": "Menunggu task",
-      "progress_pct": 0,
+      "last_heartbeat": "2026-10-01T10:55:46.698143+00:00",
+      "current_stage": "Inspecting",
+      "current_activity": "Memeriksa source / diff",
+      "progress_pct": 28,
       "last_successful_checkpoint": "P2-E"
     },
     {
@@ -41,7 +41,7 @@
       "checkpoint": "P2-D",
       "branch": "feature/phase-2-salon-operations",
       "head_sha": "c978a9d79c1fa7ff9ab3b8647f715e3a9a51466d",
-      "last_heartbeat": "2026-10-01T10:54:40.848647+00:00",
+      "last_heartbeat": "2026-10-01T10:55:40.886176+00:00",
       "current_stage": "Idle",
       "current_activity": "Menunggu task",
       "progress_pct": 0,
@@ -56,7 +56,7 @@
       "checkpoint": null,
       "branch": null,
       "head_sha": null,
-      "last_heartbeat": "2026-10-01T10:55:00.170142+00:00",
+      "last_heartbeat": "2026-10-01T10:55:45.225153+00:00",
       "current_stage": "Telegram aktif",
       "current_activity": "Semua event penting sudah terkirim",
       "progress_pct": 100,
