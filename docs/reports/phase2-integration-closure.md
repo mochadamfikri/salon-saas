@@ -78,8 +78,8 @@ black --check .
 - `black --check .`: 65 files would be left unchanged
 
 ### Backend Migration Status
-**Head:** `5497f90af712_add_salon_customers` (P2-E)  
-**Verification:** Alembic revision chain intact, no conflicts
+**Head:** `547d2dd43298` (`547d2dd43298_phase_2_salon_operations_core_v2`)  
+**Verification:** Alembic revision chain intact (`20260929_0001` -> `20260929_0002` -> `2317437c36e3` -> `547d2dd43298`), no conflicts
 
 ---
 
