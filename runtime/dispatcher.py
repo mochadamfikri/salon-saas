@@ -275,19 +275,74 @@ error handling, scope discipline and regression risk. Do not implement fixes.
 
 
 def close_ready_sources() -> None:
+    """Close only the exact frontend implementation audited by its paired frontend audit.
+
+    A backend/Hermes FINAL_PASS at the same checkpoint must never complete a
+    Codex frontend task. The audit and implementation must also be pinned to
+    the same authoritative SHA.
+    """
     con = db()
-    cps = con.execute(
-        "SELECT checkpoint FROM tasks WHERE target_agent='auditor' AND state='FINAL_PASS'"
-    ).fetchall()
-    for row in cps:
-        con.execute(
-            "UPDATE tasks SET state='COMPLETED' "
-            "WHERE checkpoint=? AND target_agent IN ('hermes','codex') "
-            "AND state='READY_FOR_AUDIT'",
-            (row["checkpoint"],),
-        )
-    con.commit()
-    con.close()
+    try:
+        for item in CHECKPOINTS:
+            impl = con.execute(
+                "SELECT id,state,target_agent,authoritative_sha "
+                "FROM tasks WHERE id=?",
+                (item["frontend_task"],),
+            ).fetchone()
+
+            audit = con.execute(
+                "SELECT id,state,target_agent,authoritative_sha "
+                "FROM tasks WHERE id=?",
+                (item["frontend_audit"],),
+            ).fetchone()
+
+            if not impl or not audit:
+                continue
+
+            if impl["target_agent"] != "codex":
+                continue
+
+            if audit["target_agent"] != "auditor":
+                continue
+
+            if impl["state"] != "READY_FOR_AUDIT":
+                continue
+
+            if audit["state"] != "FINAL_PASS":
+                continue
+
+            impl_sha = (impl["authoritative_sha"] or "").strip()
+            audit_sha = (audit["authoritative_sha"] or "").strip()
+
+            if not impl_sha or not audit_sha:
+                log(
+                    f"REFUSE CLOSE {item['frontend_task']}: "
+                    "missing authoritative SHA"
+                )
+                continue
+
+            if impl_sha != audit_sha:
+                log(
+                    f"REFUSE CLOSE {item['frontend_task']}: "
+                    f"impl={impl_sha[:8]} audit={audit_sha[:8]}"
+                )
+                continue
+
+            con.execute(
+                "UPDATE tasks SET state='COMPLETED' "
+                "WHERE id=? AND state='READY_FOR_AUDIT' "
+                "AND target_agent='codex' AND authoritative_sha=?",
+                (item["frontend_task"], impl_sha),
+            )
+
+            log(
+                f"CLOSE FRONTEND SOURCE {item['frontend_task']} "
+                f"via {item['frontend_audit']} sha={impl_sha[:8]}"
+            )
+
+        con.commit()
+    finally:
+        con.close()
 
 
 def sync_states() -> None:
