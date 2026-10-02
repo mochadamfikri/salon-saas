@@ -8,7 +8,7 @@ AUTHORITATIVE_SHA: ccdcc3782a401736347ee5a685d070e743e4b04a
 AUDIT_BASE_SHA: 93c463c35cef2f0ef17628a278fae7d526eed673
 SOURCE_AUDIT_TASK: AUDIT-P3-D
 AUDIT_REPORT: /home/ubuntu/salon-orchestrator/audit/codex/AUDIT-P3-D-ccdcc378.md
-STATUS: QUEUED
+STATUS: COMPLETED
 
 Fix every blocking finding in the audit report below. Work on the current engineering branch, preserve later compatible work, run the required regression/quality gates, commit, push, update the completion/handoff report, then stop READY_FOR_AUDIT. Do not merge, deploy, change production, or invent business rules.
 
