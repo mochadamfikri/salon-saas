@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-02T08:10:04.166821+00:00",
+  "generated_at": "2026-10-02T08:10:36.432843+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -161,11 +161,11 @@
       "target_agent": "auditor",
       "phase": 4,
       "checkpoint": "P4-A",
-      "state": "QUEUED",
+      "state": "RUNNING",
       "created_at": "2026-10-02T08:09:51.807477+00:00",
-      "started_at": null,
+      "started_at": "2026-10-02T08:10:20.370516+00:00",
       "finished_at": null,
-      "attempts": 0,
+      "attempts": 1,
       "authoritative_sha": "11b54cb28654ba6ecf79ff917e25b12c514908bc",
       "last_error": null,
       "result_path": null
