@@ -1,6 +1,7 @@
 """Pydantic schemas for branch endpoints."""
 
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -27,6 +28,16 @@ class BranchCreateRequest(BaseModel):
             raise ValueError("Code is reserved")
         return normalized
 
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        """Validate IANA timezone identifier."""
+        try:
+            ZoneInfo(value)
+            return value
+        except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid IANA timezone: '{value}'") from exc
+
 
 class BranchUpdateRequest(BaseModel):
     """Request payload for updating a branch."""
@@ -35,6 +46,18 @@ class BranchUpdateRequest(BaseModel):
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
     address: str | None = Field(default=None, max_length=500)
     phone: str | None = Field(default=None, max_length=20)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        """Validate IANA timezone identifier."""
+        if value is None:
+            return value
+        try:
+            ZoneInfo(value)
+            return value
+        except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid IANA timezone: '{value}'") from exc
 
 
 class BranchActivateRequest(BaseModel):

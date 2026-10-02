@@ -316,6 +316,21 @@ class TestBranchAPI:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
+    def test_create_branch_invalid_timezone_rejected(self, client, owner_headers, tenant_context):
+        """Create branch rejects invalid IANA timezone."""
+        response = client.post(
+            f"/salons/{tenant_context['salon'].id}/branches",
+            headers=owner_headers,
+            json={
+                "name": "Test Branch",
+                "code": "test",
+                "timezone": "InvalidZone/NotReal",
+            },
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert "timezone" in response.text.lower()
+
     def test_list_branches_all_roles(self, client, owner_headers, staff_headers, tenant_context):
         """All roles can list branches."""
         # Create test branches
@@ -458,6 +473,25 @@ class TestBranchAPI:
         )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_branch_invalid_timezone_rejected(
+        self, client, owner_headers, tenant_context, db_session
+    ):
+        """Update branch rejects invalid IANA timezone."""
+        from app.services.branch import create_branch
+
+        salon_id = tenant_context["salon"].id
+        branch = create_branch(db_session, salon_id, "Branch", "br", "Asia/Jakarta")
+        db_session.commit()
+
+        response = client.patch(
+            f"/salons/{salon_id}/branches/{branch.id}",
+            headers=owner_headers,
+            json={"timezone": "Not/A/Real/Zone"},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert "timezone" in response.text.lower()
 
     def test_activate_branch_owner_success(self, client, owner_headers, tenant_context, db_session):
         """Owner can activate/deactivate branches."""
