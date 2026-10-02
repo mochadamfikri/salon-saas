@@ -21,18 +21,23 @@ Checkpoint E closure tracks separately.
 - P3-E (Regression & Closure): FINAL PASS (audited under sha `2959cd99`)
 
 ## Phase 4 Status
-**P4-A: READY FOR AUDIT**
+**P4-A: READY FOR AUDIT** (revision `15a3526`)
 
 ### Checkpoint Status Summary
-- P4-A (Branch Domain Foundation): READY FOR AUDIT (commit `c7b2f81f`)
+- P4-A (Branch Domain Foundation): READY FOR AUDIT (initial `c7b2f81f`, revision `15a3526`)
+
+### P4-A Audit Revision (REV-P4-A-11b54cb2)
+- Fixed: `BranchUpdateRequest.address` now enforces 500-char limit matching database column
+- Added: regression test for overlong address rejection (HTTP 422)
+- Audit finding resolved: deterministic validation instead of database error
 
 ## Total Test Count
-334 backend tests PASS (Phase 1 + Phase 2 + Phase 3 + Phase 4 P4-A suite)
+335 backend tests PASS (Phase 1 + Phase 2 + Phase 3 + Phase 4 P4-A suite)
 198 frontend tests PASS (full web app test suite)
 
 ## Quality Gates Status
 **Backend:**
-- `pytest -q`: PASS (334 passed in 169.06s)
+- `pytest -q`: PASS (335 passed in 168.61s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
@@ -67,6 +72,7 @@ P4-A delivers Branch domain foundation for multi-location operations:
 - P4-E: Integration regression, full backward compatibility verification
 
 ## Working Tree Status
-Branch `feature/phase-4-branch-operations` at commit `58dd0a8`.
+Branch `feature/phase-4-branch-operations` includes P4-A audit revision commit `15a3526`.
+Revision report: `docs/reports/REV-P4-A-11b54cb2.md`.
 Pushed to `origin/feature/phase-4-branch-operations`.
-Working tree clean.
+Working tree clean after handoff commit.
