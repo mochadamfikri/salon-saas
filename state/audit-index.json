@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-02T04:27:51.273653+00:00",
+  "generated_at": "2026-10-02T04:28:23.472379+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -133,13 +133,13 @@
       "target_agent": "auditor",
       "phase": 3,
       "checkpoint": "P3-D",
-      "state": "REVISE_REQUIRED",
+      "state": "RUNNING",
       "created_at": "2026-10-02T04:20:01.581698+00:00",
       "started_at": "2026-10-02T04:20:24.111547+00:00",
       "finished_at": "2026-10-02T04:21:57.928531+00:00",
-      "attempts": 1,
-      "authoritative_sha": "ccdcc3782a401736347ee5a685d070e743e4b04a",
-      "last_error": "REVISION_TASK_ID=REV-P3-D-ccdcc378",
+      "attempts": 2,
+      "authoritative_sha": "5cde85e46f72745b7990360523fda1a57f86bf02",
+      "last_error": null,
       "result_path": "/home/ubuntu/salon-orchestrator/audit/codex/AUDIT-P3-D-ccdcc378.md"
     }
   ]
