@@ -8,7 +8,7 @@ AUTHORITATIVE_SHA: 11b54cb28654ba6ecf79ff917e25b12c514908bc
 AUDIT_BASE_SHA: 58dd0a8c70798add0299288031c035873763650e
 SOURCE_AUDIT_TASK: AUDIT-P4-A
 AUDIT_REPORT: /home/ubuntu/salon-orchestrator/audit/hermes/AUDIT-P4-A-11b54cb2.md
-STATUS: QUEUED
+STATUS: COMPLETED
 
 Fix every blocking finding in the audit report below. Work on the current engineering branch, preserve later compatible work, run the required regression/quality gates, commit, push, update the completion/handoff report, then stop READY_FOR_AUDIT. Do not merge, deploy, change production, or invent business rules.
 
