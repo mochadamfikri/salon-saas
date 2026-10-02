@@ -21,10 +21,10 @@ Checkpoint E closure tracks separately.
 - P3-E (Regression & Closure): FINAL PASS (audited under sha `2959cd99`)
 
 ## Phase 4 Status
-**P4-A: READY FOR AUDIT** (revision `88a6ffb`)
+**P4-A: READY FOR AUDIT** (revision `e99c382`)
 
 ### Checkpoint Status Summary
-- P4-A (Branch Domain Foundation): READY FOR AUDIT (initial `c7b2f81f`, rev1 `15a3526`, rev2 `88a6ffb`)
+- P4-A (Branch Domain Foundation): READY FOR AUDIT (initial `c7b2f81f`, rev1 `15a3526`, rev2 `88a6ffb`, rev3 `e99c382`)
 
 ### P4-A Audit Revision (REV-P4-A-11b54cb2)
 - Fixed: `BranchUpdateRequest.address` now enforces 500-char limit matching database column
@@ -37,13 +37,19 @@ Checkpoint E closure tracks separately.
 - Added: 2 regression tests for invalid timezone rejection (HTTP 422) on create and update paths
 - Audit finding resolved: prevents invalid timezone persistence that would break branch-aware scheduling
 
+### P4-A Audit Revision (REV-P4-A-d54312dc)
+- Fixed: Branch creation IntegrityError handling now restricts 409 mapping to specific `uq_branches_salon_code` constraint
+- Added: `_is_expected_duplicate_error` helper matching established codebase pattern
+- Added: 2 regression tests verifying expected constraint → 409, unrelated constraint → propagate
+- Audit finding resolved: unrelated integrity failures no longer disguised as business conflicts per PROJECT_RULES
+
 ## Total Test Count
-337 backend tests PASS (Phase 1 + Phase 2 + Phase 3 + Phase 4 P4-A suite)
+339 backend tests PASS (Phase 1 + Phase 2 + Phase 3 + Phase 4 P4-A suite)
 198 frontend tests PASS (full web app test suite)
 
 ## Quality Gates Status
 **Backend:**
-- `pytest -q`: PASS (337 passed in 166.69s)
+- `pytest -q`: PASS (339 passed in 169.07s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
@@ -78,7 +84,7 @@ P4-A delivers Branch domain foundation for multi-location operations:
 - P4-E: Integration regression, full backward compatibility verification
 
 ## Working Tree Status
-Branch `feature/phase-4-branch-operations` includes P4-A audit revision commit `88a6ffb`.
-Revision report: `docs/reports/REV-P4-A-ce4a4345.md`.
-Implementation commit pushed to `origin/feature/phase-4-branch-operations`; this handoff/report update remains to be committed.
+Branch `feature/phase-4-branch-operations` includes P4-A audit revision commit `e99c382`.
+Revision report: `docs/reports/REV-P4-A-d54312dc.md`.
+Implementation, report, and handoff commits are pushed to `origin/feature/phase-4-branch-operations`.
 Status: READY_FOR_AUDIT; do not start P4-B until P4-A receives FINAL_PASS.
