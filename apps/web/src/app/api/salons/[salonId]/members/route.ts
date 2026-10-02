@@ -1,0 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
+import { applySessionOutcome, authorizedCall, bffErrorResponse, createBackendClient } from "@/lib/auth/bff";
+import { errorMessageFor } from "@/lib/auth/ui-messages";
+export async function GET(req: NextRequest, { params }: { params: Promise<{ salonId: string }> }) { const { salonId } = await params; const backend = createBackendClient(); const outcome = await authorizedCall({ backend, req }, (token) => backend.listMembers(token, salonId)); if (!outcome.result.ok) { const res = bffErrorResponse(outcome.result.code, errorMessageFor(outcome.result.code, outcome.result.retryAfterSeconds)); applySessionOutcome(res, outcome); return res; } const res = NextResponse.json({ ok: true, members: outcome.result.data }); applySessionOutcome(res, outcome); return res; }

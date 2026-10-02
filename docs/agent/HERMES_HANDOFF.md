@@ -11,57 +11,68 @@ Checkpoint E closure tracks separately.
 **PHASE 2 CLOSURE: FINAL PASS** (audited under sha `c08e42d09407f8493e64e4ad8b21ff43c01b6e6d`)
 
 ## Phase 3 Status
-**P3-C: READY FOR AUDIT**
+**P3-E: READY FOR AUDIT**
 
 ### Checkpoint Status Summary
 - P3-A (Booking Domain & Lifecycle): FINAL PASS (audited under sha `c5368f42fc94fc17c01f1281f9a01ba44eee2ea4`)
 - P3-B (Availability & Capability): FINAL PASS (audited under sha `d1b60a769359cc33868d1ed263c36116a7888ea9`)
-- P3-C (Appointment API): READY FOR AUDIT (implemented at sha `0059845`)
-- P3-D (Calendar UI): WAITING_DEPENDENCY
-- P3-E (Regression & Closure): WAITING_DEPENDENCY
+- P3-C (Appointment API): FINAL PASS (audited under sha `627e6fa57ca19bc92854678e77a707976f962c7e`)
+- P3-D (Calendar UI): FINAL PASS (audited under sha `5cde85e46f72745b7990360523fda1a57f86bf02`)
+- P3-E (Regression & Closure): READY FOR AUDIT
 
 ## Total Test Count
-304 tests PASS (Phase 1 + Phase 2 + P3-A + P3-B + P3-C suite)
+304 backend tests PASS (Phase 1 + Phase 2 + Phase 3 suite)
+198 frontend tests PASS (full web app test suite)
 
 ## Quality Gates Status
-- `pytest -q`: PASS (304 passed in 148.25s)
+**Backend:**
+- `pytest -q`: PASS (304 passed in 149.90s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
 
-## Deliverables in P3-C
+**Frontend:**
+- `npm run test:web`: PASS (198 passed in 22.30s)
+- `npm run lint:web`: PASS
 
-### Schemas (`apps/api/app/schemas/appointment.py`)
-- `AppointmentCreateRequest`: customer, service, staff, starts_at, timezone, notes (all validated).
-- `AppointmentUpdateRequest` (alias `AppointmentRescheduleRequest`): optional starts_at, timezone, notes for reschedule or notes-only updates.
-- `AppointmentResponse`: full appointment representation including snapshots, UTC instants, timezone, status, and timestamps.
+## Phase 3 Integration Summary
 
-### Service Layer Additions (`apps/api/app/services/appointment.py`)
-- `get_appointment(db, appointment_id, salon_id)`: tenant-scoped retrieval (returns None for 404 boundary).
-- `list_appointments(db, salon_id, ...)`: filtering by date range, staff, customer, service, status; pagination with offset/limit; deterministic ordering.
-- `reschedule_appointment(db, appointment, starts_at, timezone_name, notes)`: rejects terminal states, re-validates capability/availability/conflict with self-exclusion.
+Phase 3 adds appointment booking engine with full lifecycle management, timezone-aware scheduling, staff capability and availability validation, and conflict detection. Frontend calendar UI supports day/week views, filtering, creation, rescheduling, and status transitions.
 
-### Router & Endpoints (`apps/api/app/routers/appointment.py`)
-- `POST /salons/{salon_id}/appointments`: create with full validation (404/422/409 error mapping).
-- `GET /salons/{salon_id}/appointments`: list with filters (starts_at_gte, starts_at_lte, staff_profile_id, customer_id, service_id, status), pagination (offset, limit).
-- `GET /salons/{salon_id}/appointments/{appointment_id}`: detail retrieval (404 when not found or cross-tenant).
-- `PATCH /salons/{salon_id}/appointments/{appointment_id}`: reschedule (starts_at + timezone together) and/or update notes; rejects terminal appointments.
-- `POST /salons/{salon_id}/appointments/{appointment_id}/{action}`: status transitions (`/confirm`, `/complete`, `/cancel`, `/no-show`), idempotent-safe, rejects invalid terminal transitions.
-- DELETE not implemented (405 Method Not Allowed).
+### Backend Deliverables (P3-A/B/C)
+- Appointment model with UTC instants, timezone storage, and service/price/duration snapshots
+- Lifecycle validator (scheduled → confirmed/cancelled/completed/no_show; confirmed → completed/cancelled/no_show)
+- Tenant isolation and cross-tenant 404 enforcement
+- Availability resolver with day-of-week mapping and time slot validation
+- Capability validator (staff-service assignment + is_bookable check)
+- Overlap/conflict engine with self-exclusion for reschedule and adjacency support
+- Appointment API: create, list (with filters/pagination), retrieve, reschedule (PATCH), status actions (POST confirm/complete/cancel/no-show)
+- 83 comprehensive backend tests covering domain, conflict, timezone, API contract, role authorization, error handling
 
-### Tests (`apps/api/tests/test_appointment_p3c.py`)
-31 comprehensive API contract tests covering:
-- CRUD operations (create, list, get, reschedule).
-- Role authorization (Owner, Manager, Staff permitted).
-- Error handling (404 cross-tenant, 422 validation, 409 conflict).
-- Filters (date range, staff, customer, service, status).
-- Pagination (offset, limit).
-- Status transitions (confirm, complete, cancel, no-show) with idempotency and terminal state rejection.
-- Edge cases: adjacent bookings, cancelled slot reuse, self-reschedule, notes-only updates, hard delete prohibition, unauthenticated/non-member isolation.
+### Frontend Deliverables (P3-D)
+- AppointmentCalendar component with day/week/list views, status filtering, and local date navigation
+- Appointment creation dialog with customer/service/staff pickers, datetime-local input, timezone field, and suggested time slots from weekly availability (informational UX only)
+- Reschedule, confirm, complete, cancel, no-show actions with idempotent-safe mutation
+- BFF routes for list, create, retrieve, reschedule, and status transitions
+- 404/409/422 error mapping and display
+- No token exposure to browser JSON (authorizedCall/applySessionOutcome session handling)
 
-## Explicitly Deferred to Later Checkpoints
-- P3-D: Frontend calendar UI (day/week/list views), appointment creation/reschedule dialogs, customer/staff/service pickers, available-time slots UX, 404/409/422 error display via BFF.
-- P3-E: Full end-to-end regression (auth/session + Phase 2 + P3-A/B/C domain + frontend production build) and phase closure.
+### Integration Verification
+- Backend-frontend contract alignment confirmed (schemas, endpoints, error codes)
+- Phase 1 auth baseline preserved (session refresh, tenant resolution, token non-exposure)
+- Phase 2 operational baseline preserved (services, staff, availability, customers)
+- Cross-phase regression: no schema conflicts, no cascade deletes affecting Phase 1/2 workflows
+- Frontend production build verified independently on P3-D isolated branch (`5cde85e`)
+
+## Explicitly Deferred to Phase 4+
+- Payments/POS
+- Recurring appointments
+- Public customer booking
+- Waitlist/queue
+- Multi-branch routing
+- Notifications (email/SMS/WhatsApp)
+- Staff commissions/payroll
+- Inventory/products
 
 ## Working Tree Status
 Clean on branch `feature/phase-3-booking-engine`.
