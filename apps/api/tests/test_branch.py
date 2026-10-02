@@ -576,3 +576,67 @@ class TestBranchAPI:
             json={"is_active": False},
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestBranchIntegrityErrorHandling:
+    """Test deterministic IntegrityError handling."""
+
+    def test_branch_duplicate_code_integrity_error_mapped_to_409(
+        self, monkeypatch, client, owner_headers, tenant_context
+    ):
+        """Simulated duplicate code constraint IntegrityError maps to 409."""
+        from app.routers import branch as branch_module
+        from sqlalchemy.exc import IntegrityError
+
+        class DummyDiag:
+            constraint_name = "uq_branches_salon_code"
+
+        class DummyOrig(Exception):
+            diag = DummyDiag()
+
+        def fake_create(*args, **kwargs):
+            raise IntegrityError("duplicate key", None, DummyOrig())
+
+        monkeypatch.setattr(branch_module, "create_branch", fake_create)
+
+        response = client.post(
+            f"/salons/{tenant_context['salon'].id}/branches",
+            headers=owner_headers,
+            json={
+                "name": "Test Branch",
+                "code": "test",
+                "timezone": "Asia/Jakarta",
+            },
+        )
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert "already exists" in response.json()["detail"].lower()
+
+    def test_unrelated_integrity_error_not_converted_to_409(
+        self, monkeypatch, client, owner_headers, tenant_context
+    ):
+        """Unrelated IntegrityError is not caught (propagates as 500)."""
+        from app.routers import branch as branch_module
+        from sqlalchemy.exc import IntegrityError
+
+        class DummyDiag:
+            constraint_name = "some_unrelated_constraint"
+
+        class DummyOrig(Exception):
+            diag = DummyDiag()
+
+        def fake_create(*args, **kwargs):
+            raise IntegrityError("foreign key violation", None, DummyOrig())
+
+        monkeypatch.setattr(branch_module, "create_branch", fake_create)
+
+        # Unrelated IntegrityError must not be caught as 409
+        with pytest.raises(IntegrityError):
+            client.post(
+                f"/salons/{tenant_context['salon'].id}/branches",
+                headers=owner_headers,
+                json={
+                    "name": "Test Branch",
+                    "code": "test",
+                    "timezone": "Asia/Jakarta",
+                },
+            )

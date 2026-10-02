@@ -26,6 +26,12 @@ from app.services.branch import (
 router = APIRouter(tags=["branches"])
 
 
+def _is_expected_duplicate_error(error: IntegrityError, constraint_name: str) -> bool:
+    """Return whether an IntegrityError is the expected named UNIQUE constraint."""
+    diagnostics = getattr(getattr(error, "orig", None), "diag", None)
+    return getattr(diagnostics, "constraint_name", None) == constraint_name
+
+
 def _get_tenant_branch_or_404(tenant: TenantContext, branch_id: UUID) -> Branch:
     """Load one branch only when it belongs to the current tenant."""
     branch = get_branch(tenant.db, branch_id, tenant.salon.id)
@@ -53,12 +59,14 @@ def create_branch_endpoint(
         )
         tenant.db.commit()
         return BranchResponse.model_validate(branch)
-    except IntegrityError:
+    except IntegrityError as error:
         tenant.db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Branch code already exists in this salon",
-        ) from None
+        if _is_expected_duplicate_error(error, "uq_branches_salon_code"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Branch code already exists in this salon",
+            ) from None
+        raise
 
 
 @router.get("/salons/{salon_id}/branches", response_model=list[BranchResponse])
