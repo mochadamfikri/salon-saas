@@ -134,6 +134,18 @@ export interface BackendSalonCustomerWrite {
   full_name?: string; email?: string | null; phone?: string | null; notes?: string | null;
 }
 
+export type AppointmentStatus = "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show";
+export interface BackendAppointment {
+  id: string; salon_id: string; customer_id: string; service_id: string; staff_profile_id: string;
+  starts_at: string; ends_at: string; timezone: string; service_name_snapshot: string;
+  duration_minutes_snapshot: number; price_amount_snapshot: string; currency_snapshot: string;
+  status: AppointmentStatus; notes: string | null; created_at: string; updated_at: string;
+}
+export interface BackendAppointmentCreate {
+  customer_id: string; service_id: string; staff_profile_id: string; starts_at: string; timezone: string; notes?: string | null;
+}
+export interface BackendAppointmentUpdate { starts_at?: string; timezone?: string; notes?: string | null }
+
 /**
  * Canonical backend contract (Checkpoint D — implemented and live on
  * `feature/phase-1-auth-tenancy`, verified against backend HEAD 5171a18).

@@ -28,6 +28,9 @@ import type {
   BackendAvailabilityWrite,
   BackendTokenPair,
   BackendUser,
+  BackendAppointment,
+  BackendAppointmentCreate,
+  BackendAppointmentUpdate,
 } from "./contracts";
 
 /** Machine-readable error codes derived from backend responses. */
@@ -237,6 +240,26 @@ export class BackendClient {
 
   listCustomers(accessToken: string, salonId: string): Promise<BackendResult<BackendSalonCustomer[]>> {
     return this.request<BackendSalonCustomer[]>(`/salons/${encodeURIComponent(salonId)}/customers`, { method: "GET", accessToken });
+  }
+
+  listAppointments(accessToken: string, salonId: string, query: URLSearchParams): Promise<BackendResult<BackendAppointment[]>> {
+    return this.request<BackendAppointment[]>(`/salons/${encodeURIComponent(salonId)}/appointments?${query.toString()}`, { method: "GET", accessToken });
+  }
+
+  getAppointment(accessToken: string, salonId: string, appointmentId: string): Promise<BackendResult<BackendAppointment>> {
+    return this.request<BackendAppointment>(`/salons/${encodeURIComponent(salonId)}/appointments/${encodeURIComponent(appointmentId)}`, { method: "GET", accessToken });
+  }
+
+  createAppointment(accessToken: string, salonId: string, body: BackendAppointmentCreate): Promise<BackendResult<BackendAppointment>> {
+    return this.request<BackendAppointment>(`/salons/${encodeURIComponent(salonId)}/appointments`, { method: "POST", body, accessToken });
+  }
+
+  updateAppointment(accessToken: string, salonId: string, appointmentId: string, body: BackendAppointmentUpdate): Promise<BackendResult<BackendAppointment>> {
+    return this.request<BackendAppointment>(`/salons/${encodeURIComponent(salonId)}/appointments/${encodeURIComponent(appointmentId)}`, { method: "PATCH", body, accessToken });
+  }
+
+  appointmentAction(accessToken: string, salonId: string, appointmentId: string, action: "confirm" | "complete" | "cancel" | "no-show"): Promise<BackendResult<BackendAppointment>> {
+    return this.request<BackendAppointment>(`/salons/${encodeURIComponent(salonId)}/appointments/${encodeURIComponent(appointmentId)}/${action}`, { method: "POST", accessToken });
   }
 
   getCustomer(accessToken: string, salonId: string, customerId: string): Promise<BackendResult<BackendSalonCustomer>> {
