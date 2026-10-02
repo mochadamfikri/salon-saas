@@ -1,11 +1,18 @@
-# Automated Audit — P4-A
+TARGET_AGENT: HERMES
+TASK_ID: REV-P4-A-ce4a4345
+PHASE: 4
+CHECKPOINT: P4-A
+TYPE: revision
+PRIORITY: 5
+AUTHORITATIVE_SHA: ce4a4345dd7e2d52cff2bccef5522c34df34fe0f
+AUDIT_BASE_SHA: 58dd0a8c70798add0299288031c035873763650e
+SOURCE_AUDIT_TASK: AUDIT-P4-A
+AUDIT_REPORT: /home/ubuntu/salon-orchestrator/audit/hermes/AUDIT-P4-A-ce4a4345.md
+STATUS: QUEUED
 
-- Source agent: hermes
-- Source branch: feature/phase-4-branch-operations
-- Base SHA: 58dd0a8c70798add0299288031c035873763650e
-- Audited SHA: ce4a4345dd7e2d52cff2bccef5522c34df34fe0f
-- Generated: 2026-10-02T09:08:57.757041+00:00
+Fix every blocking finding in the audit report below. Work on the current engineering branch, preserve later compatible work, run the required regression/quality gates, commit, push, update the completion/handoff report, then stop READY_FOR_AUDIT. Do not merge, deploy, change production, or invent business rules.
 
+===== AUDIT REPORT =====
 **Audit Report**
 - Checkpoint: P4-A; audited SHA: `ce4a4345dd7e2d52cff2bccef5522c34df34fe0f`.
 - Scope: reviewed the pinned revision diff, branch API/service/schema, model and migration, branch tests, and Phase 4 contract. Runtime status confirms Phase 3 is `FINAL_PASS`.
