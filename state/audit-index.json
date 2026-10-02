@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-02T05:26:37.272652+00:00",
+  "generated_at": "2026-10-02T05:27:09.516057+00:00",
   "audits": [
     {
       "id": "AUDIT-P2-D-d797720",
@@ -147,14 +147,14 @@
       "target_agent": "auditor",
       "phase": 3,
       "checkpoint": "P3-E",
-      "state": "RUNNING",
+      "state": "BLOCKED",
       "created_at": "2026-10-02T05:20:47.276079+00:00",
       "started_at": "2026-10-02T05:20:59.501571+00:00",
-      "finished_at": null,
+      "finished_at": "2026-10-02T05:26:49.931751+00:00",
       "attempts": 1,
       "authoritative_sha": "2959cd997f3005730e7851cfec6b7388eef1f348",
-      "last_error": null,
-      "result_path": null
+      "last_error": "Automated auditor could not produce a reliable PASS/REVISE verdict",
+      "result_path": "/home/ubuntu/salon-orchestrator/audit/hermes/AUDIT-P3-E-2959cd99.md"
     }
   ]
 }
