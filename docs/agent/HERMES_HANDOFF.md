@@ -1,7 +1,7 @@
 # Hermes Handoff
 
 ## Current Branch
-feature/phase-3-booking-engine
+feature/phase-4-branch-operations
 
 ## Phase 1 Status
 Checkpoint A-D PASS.
@@ -11,22 +11,28 @@ Checkpoint E closure tracks separately.
 **PHASE 2 CLOSURE: FINAL PASS** (audited under sha `c08e42d09407f8493e64e4ad8b21ff43c01b6e6d`)
 
 ## Phase 3 Status
-**P3-E: READY FOR AUDIT**
+**PHASE 3 CLOSURE: FINAL PASS** (audited under sha `2959cd99`)
 
 ### Checkpoint Status Summary
 - P3-A (Booking Domain & Lifecycle): FINAL PASS (audited under sha `c5368f42fc94fc17c01f1281f9a01ba44eee2ea4`)
 - P3-B (Availability & Capability): FINAL PASS (audited under sha `d1b60a769359cc33868d1ed263c36116a7888ea9`)
 - P3-C (Appointment API): FINAL PASS (audited under sha `627e6fa57ca19bc92854678e77a707976f962c7e`)
 - P3-D (Calendar UI): FINAL PASS (audited under sha `5cde85e46f72745b7990360523fda1a57f86bf02`)
-- P3-E (Regression & Closure): READY FOR AUDIT
+- P3-E (Regression & Closure): FINAL PASS (audited under sha `2959cd99`)
+
+## Phase 4 Status
+**P4-A: READY FOR AUDIT**
+
+### Checkpoint Status Summary
+- P4-A (Branch Domain Foundation): READY FOR AUDIT (commit `c7b2f81f`)
 
 ## Total Test Count
-304 backend tests PASS (Phase 1 + Phase 2 + Phase 3 suite)
+334 backend tests PASS (Phase 1 + Phase 2 + Phase 3 + Phase 4 P4-A suite)
 198 frontend tests PASS (full web app test suite)
 
 ## Quality Gates Status
 **Backend:**
-- `pytest -q`: PASS (304 passed in 149.90s)
+- `pytest -q`: PASS (334 passed in 169.06s)
 - `ruff check .`: PASS
 - `ruff format --check .`: PASS
 - `black --check .`: PASS
@@ -35,45 +41,32 @@ Checkpoint E closure tracks separately.
 - `npm run test:web`: PASS (198 passed in 22.30s)
 - `npm run lint:web`: PASS
 
-## Phase 3 Integration Summary
+## Phase 4 P4-A Implementation Summary
 
-Phase 3 adds appointment booking engine with full lifecycle management, timezone-aware scheduling, staff capability and availability validation, and conflict detection. Frontend calendar UI supports day/week views, filtering, creation, rescheduling, and status transitions.
+P4-A delivers Branch domain foundation for multi-location operations:
 
-### Backend Deliverables (P3-A/B/C)
-- Appointment model with UTC instants, timezone storage, and service/price/duration snapshots
-- Lifecycle validator (scheduled → confirmed/cancelled/completed/no_show; confirmed → completed/cancelled/no_show)
-- Tenant isolation and cross-tenant 404 enforcement
-- Availability resolver with day-of-week mapping and time slot validation
-- Capability validator (staff-service assignment + is_bookable check)
-- Overlap/conflict engine with self-exclusion for reschedule and adjacency support
-- Appointment API: create, list (with filters/pagination), retrieve, reschedule (PATCH), status actions (POST confirm/complete/cancel/no-show)
-- 83 comprehensive backend tests covering domain, conflict, timezone, API contract, role authorization, error handling
+### Backend Deliverables
+- Branch model: salon_id, code (unique per salon), timezone, address, phone, is_active
+- Default branch migration: creates "Main Branch" (code: `main`) for existing salons
+- Branch service layer: create, list (with active filter), get, update, activate/deactivate
+- Branch API: CRUD endpoints with Owner/Manager mutate, Staff read-only
+- Tenant isolation: all operations enforce salon-scoped access, cross-tenant → 404
+- RBAC enforcement: Permission.MANAGE_STAFF gates mutation operations
+- 26 comprehensive tests: model constraints, service logic, API contract, RBAC, tenant isolation
 
-### Frontend Deliverables (P3-D)
-- AppointmentCalendar component with day/week/list views, status filtering, and local date navigation
-- Appointment creation dialog with customer/service/staff pickers, datetime-local input, timezone field, and suggested time slots from weekly availability (informational UX only)
-- Reschedule, confirm, complete, cancel, no-show actions with idempotent-safe mutation
-- BFF routes for list, create, retrieve, reschedule, and status transitions
-- 404/409/422 error mapping and display
-- No token exposure to browser JSON (authorizedCall/applySessionOutcome session handling)
+### Migration
+- Head: `d3ee55b72596`
+- Creates `branches` table with UNIQUE(salon_id, code) constraint
+- Indexes: `salon_id`, (`salon_id`, `is_active`)
+- Backward compatibility: default branch inserted for all existing salons
 
-### Integration Verification
-- Backend-frontend contract alignment confirmed (schemas, endpoints, error codes)
-- Phase 1 auth baseline preserved (session refresh, tenant resolution, token non-exposure)
-- Phase 2 operational baseline preserved (services, staff, availability, customers)
-- Cross-phase regression: no schema conflicts, no cascade deletes affecting Phase 1/2 workflows
-- Frontend production build verified independently on P3-D isolated branch (`5cde85e`)
-
-## Explicitly Deferred to Phase 4+
-- Payments/POS
-- Recurring appointments
-- Public customer booking
-- Waitlist/queue
-- Multi-branch routing
-- Notifications (email/SMS/WhatsApp)
-- Staff commissions/payroll
-- Inventory/products
+## Explicitly Deferred to Later P4 Checkpoints
+- P4-B: Branch staff assignment, branch-service enablement/config, branch-aware availability
+- P4-C: Appointment-branch linkage, appointment default branch migration
+- P4-D: Frontend branch switcher, branch management UI
+- P4-E: Integration regression, full backward compatibility verification
 
 ## Working Tree Status
-Clean on branch `feature/phase-3-booking-engine`.
-Pushed to `origin/feature/phase-3-booking-engine`.
+Branch `feature/phase-4-branch-operations` at commit `58dd0a8`.
+Pushed to `origin/feature/phase-4-branch-operations`.
+Working tree clean.
