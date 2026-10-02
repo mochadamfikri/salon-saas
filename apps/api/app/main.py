@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.routers.appointment import router as appointment_router
 from app.routers.auth import router as auth_router
 from app.routers.availability import router as availability_router
+from app.routers.branch import router as branch_router
 from app.routers.customer import router as customer_router
 from app.routers.invitation import router as invitation_router
 from app.routers.password_reset import router as password_reset_router
@@ -27,6 +28,7 @@ app = FastAPI(
 app.include_router(appointment_router)
 app.include_router(auth_router)
 app.include_router(availability_router)
+app.include_router(branch_router)
 app.include_router(customer_router)
 app.include_router(invitation_router)
 app.include_router(password_reset_router)

@@ -32,7 +32,7 @@ def test_migrations_upgrade_configured_development_database_to_head() -> None:
     with engine.connect() as connection:
         revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
 
-    assert revision == "9ecad5e4f77e"
+    assert revision == "d3ee55b72596"
 
 
 def test_migrations_upgrade_clean_database_to_head() -> None:
@@ -79,8 +79,8 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
                 ).fetchall()
             }
 
-        assert revision == ("9ecad5e4f77e",)
-        assert {
+        assert revision == ("d3ee55b72596",)
+        expected_tables = {
             "platform_metadata",
             "users",
             "salons",
@@ -94,11 +94,16 @@ def test_migrations_upgrade_clean_database_to_head() -> None:
             "staff_weekly_availability",
             "salon_customers",
             "appointments",
-        }.issubset(tables)
+            "branches",
+        }
+        assert expected_tables.issubset(tables)
     finally:
         with psycopg.connect(**connection_kwargs) as connection:
             connection.execute(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s",
-                (database_name,),
+                f"""
+                SELECT pg_terminate_backend(pid)
+                FROM pg_stat_activity
+                WHERE datname = '{database_name}' AND pid <> pg_backend_pid()
+                """
             )
             connection.execute(f'DROP DATABASE IF EXISTS "{database_name}"')

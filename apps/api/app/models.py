@@ -91,6 +91,7 @@ class Salon(TimestampMixin, Base):
     services: Mapped[list["SalonService"]] = relationship(back_populates="salon")
     customers: Mapped[list["SalonCustomer"]] = relationship(back_populates="salon")
     appointments: Mapped[list["Appointment"]] = relationship(back_populates="salon")
+    branches: Mapped[list["Branch"]] = relationship(back_populates="salon")
 
 
 class SalonMembership(TimestampMixin, Base):
@@ -432,3 +433,36 @@ class Appointment(TimestampMixin, Base):
     customer: Mapped["SalonCustomer"] = relationship(back_populates="appointments")
     service: Mapped["SalonService"] = relationship(back_populates="appointments")
     staff_profile: Mapped["StaffProfile"] = relationship(back_populates="appointments")
+
+
+# ============================================================================
+# Phase 4: Multi-Location / Branch Operations
+# ============================================================================
+
+
+class Branch(TimestampMixin, Base):
+    """Operational location inside a salon.
+
+    Branch is tenant-scoped (salon_id). Each salon has one or more branches.
+    Branch code is unique within salon and used for URL routing/identification.
+    Timezone determines local scheduling interpretation for branch operations.
+    """
+
+    __tablename__ = "branches"
+    __table_args__ = (
+        UniqueConstraint("salon_id", "code", name="uq_branches_salon_code"),
+        Index("ix_branches_salon_is_active", "salon_id", "is_active"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    salon_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("salons.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    address: Mapped[str] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    is_active: Mapped[bool] = mapped_column(nullable=False, server_default="true")
+
+    salon: Mapped["Salon"] = relationship(back_populates="branches")
