@@ -439,6 +439,26 @@ class TestBranchAPI:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_update_branch_rejects_overlong_address(
+        self, client, owner_headers, tenant_context, db_session
+    ):
+        """Update rejects address longer than 500 characters."""
+        from app.services.branch import create_branch
+
+        salon_id = tenant_context["salon"].id
+        branch = create_branch(db_session, salon_id, "Branch", "br", "Asia/Jakarta")
+        db_session.commit()
+
+        overlong_address = "A" * 501
+
+        response = client.patch(
+            f"/salons/{salon_id}/branches/{branch.id}",
+            headers=owner_headers,
+            json={"address": overlong_address},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
     def test_activate_branch_owner_success(self, client, owner_headers, tenant_context, db_session):
         """Owner can activate/deactivate branches."""
         from app.services.branch import create_branch
